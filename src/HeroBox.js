@@ -19,6 +19,35 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
         };
     };
 
+    // Format forced bet display
+    const formatForcedBet = (forcedBet) => {
+        if (!forcedBet) return null;
+        
+        let display = [];
+        
+        if (forcedBet.type === 'SB') {
+            display.push(`SB $${forcedBet.amount}`);
+        } else if (forcedBet.type === 'BB') {
+            display.push(`BB $${forcedBet.amount}`);
+        } else if (forcedBet.type === 'ANTE') {
+            display.push(`A $${forcedBet.amount}`);
+        } else if (forcedBet.type === 'BB_ANTE') {
+            display.push(`BBA $${forcedBet.amount}`);
+        }
+        
+        // Add ante if present
+        if (forcedBet.ante) {
+            display.push(`A $${forcedBet.ante}`);
+        }
+        
+        // Add big blind ante if present
+        if (forcedBet.bbAnte) {
+            display.push(`BBA $${forcedBet.bbAnte}`);
+        }
+        
+        return display.join(' + ');
+    };
+
     return (
         <div
             className="hero-box-container"
@@ -53,6 +82,13 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
                     </div>
                 )}
             </div>
+            
+            {/* Forced bet indicator */}
+            {player.forcedBet && (
+                <div className="forced-bet">
+                    {formatForcedBet(player.forcedBet)}
+                </div>
+            )}
             
             {/* Player cards */}
             <div className="player-cards">

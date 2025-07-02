@@ -1,122 +1,37 @@
 // Hand.js - Complete hand history data structure based on https://hh-specs.handhistory.org/
-
-// Card representation
-class Card {
-  constructor(rank, suit) {
-    this.rank = rank; // 2-9, T, J, Q, K, A
-    this.suit = suit; // c, d, h, s
-  }
-
-  toString() {
-    return `${this.rank}${this.suit}`;
-  }
-
-  static fromString(str) {
-    if (!str || str.length !== 2) return null;
-    return new Card(str[0], str[1]);
-  }
-}
-
-// Player in a hand
-class Player {
-  constructor(name, seatNumber, startingChips) {
-    this.name = name;
-    this.seatNumber = seatNumber;
-    this.startingChips = startingChips;
-    this.cards = [];
-    this.showCards = false;
-  }
-}
-
-// Individual action
-class Action {
-  constructor(playerName, type, amount = null, allIn = false) {
-    this.playerName = playerName;
-    this.type = type; // fold, check, call, bet, raise
-    this.amount = amount;
-    this.allIn = allIn;
-    this.timestamp = new Date().toISOString();
-  }
-}
-
-// Pot information
-class Pot {
-  constructor(number, amount, rake = 0) {
-    this.number = number;
-    this.amount = amount;
-    this.rake = rake;
-    this.eligiblePlayers = [];
-    this.winners = [];
-  }
-}
-
-// Street (betting round)
-class Street {
-  constructor(name) {
-    this.name = name; // preflop, flop, turn, river
-    this.actions = [];
-    this.cards = []; // Community cards dealt this street
-    this.pot = 0;
-  }
-
-  addAction(action) {
-    this.actions.push(action);
-  }
-}
+import { Player } from "./Player";
 
 // Main Hand class
 class Hand {
   constructor() {
-    // Basic info
-    this.id = this.generateId();
-    this.timestamp = new Date().toISOString();
-    this.handNumber = null;
-    
-    // Game info
-    this.siteName = "Live Game";
+    this.specVersion = "1.4.6";
+    this.siteName = "Bellagio"; // TODO: user input
+    this.networkName = "Live Game";
+    this.internalVersion = "";
+    this.tournament = false;
+    this.tournamentInfo = null;
+    this.GameNumber = 0;
+    this.startDateUtc = "";
     this.tableName = "";
+    this.tableHandle = "";
+    this.tableSkin = "";
     this.gameType = "NLH"; // NLH, PLO, etc.
+    this.betLimit = null;
     this.tableSize = 9;
     this.currency = "USD";
-    
-    // Stakes
-    this.smallBlind = 0;
-    this.bigBlind = 0;
-    this.ante = 0;
-    this.bigBlindAnte = 0;
-    this.straddles = [];
-    
-    // Players
-    this.players = [];
-    this.heroName = null;
-    this.dealerSeat = null;
-    
-    // Streets
-    this.streets = {
-      preflop: new Street('preflop'),
-      flop: new Street('flop'),
-      turn: new Street('turn'),
-      river: new Street('river')
-    };
-    this.currentStreet = 'preflop';
-    
-    // Community cards
-    this.communityCards = [];
-    
-    // Pots
-    this.pots = [];
-    this.totalPot = 0;
-    this.rake = 0;
-    
-    // Showdown
-    this.showdown = [];
-    
-    // Results
-    this.winners = [];
-  }
+    this.dealerSeat = 0;
+    this.smallBlindAmount = 0;
+    this.bigBlindAmount = 0;
+    this.anteAmount = 0;
+    this.bigBlindAnteAmount = 0;
 
-  generateId() {
-    return `hand_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.heroPlayerId = 0;
+    this.flags = [];
+    this.players = [];
+    this.rounds = [];
+    this.pots = [];
+
+    this.tournamentBounties = [];
   }
 
   // Player management
@@ -134,32 +49,10 @@ class Hand {
     this.dealerSeat = seatNumber;
   }
 
-  // Deal cards
-  dealHoleCards(playerName, cards) {
-    const player = this.players.find(p => p.name === playerName);
-    if (player) {
-      player.cards = cards.map(c => typeof c === 'string' ? Card.fromString(c) : c);
-    }
-  }
-
-  dealCommunityCards(street, cards) {
-    const streetCards = cards.map(c => typeof c === 'string' ? Card.fromString(c) : c);
-    this.streets[street].cards = streetCards;
-    this.communityCards.push(...streetCards);
-  }
-
   // Actions
-  addAction(playerName, type, amount = null, allIn = false) {
-    const action = new Action(playerName, type, amount, allIn);
-    this.streets[this.currentStreet].addAction(action);
+  addAction(action) {
     
-    // Update pot
-    if (amount) {
-      this.streets[this.currentStreet].pot += amount;
-      this.totalPot += amount;
-    }
-    
-    return action;
+    return;
   }
 
   // Move to next street
@@ -172,39 +65,22 @@ class Hand {
   }
 
   // Forced bets
-  postSmallBlind(playerName) {
-    this.addAction(playerName, 'post', this.smallBlind);
+  postSmallBlind() {
+    this.addAction({action: "post_sb"});
   }
 
-  postBigBlind(playerName) {
-    this.addAction(playerName, 'post', this.bigBlind);
+  postBigBlind() {
+    this.addAction({action: "post_bb"});
   }
 
-  postAnte(playerName) {
-    this.addAction(playerName, 'post', this.ante);
+  postAnte() {
+    this.addAction({action: "post_ante"});
   }
 
-  postBigBlindAnte(playerName) {
-    this.addAction(playerName, 'post', this.bigBlindAnte);
+  postBigBlindAnte() {
+    this.addAction({action: "post_bba"});
   }
 
-  // Showdown
-  addShowdown(playerName, cards, handRank = null) {
-    this.showdown.push({
-      playerName,
-      cards: cards.map(c => typeof c === 'string' ? Card.fromString(c) : c),
-      handRank
-    });
-  }
-
-  // Winners
-  addWinner(playerName, amount, potNumber = 0) {
-    this.winners.push({
-      playerName,
-      amount,
-      potNumber
-    });
-  }
 
   // Export to standard format
   toJSON() {
@@ -299,4 +175,62 @@ class Hand {
   }
 }
 
-export { Hand, Card, Player, Action, Pot, Street };
+
+
+// Card representation
+class Card {
+  constructor(rank, suit) {
+    this.rank = rank; // 2-9, T, J, Q, K, A
+    this.suit = suit; // c, d, h, s
+  }
+
+  toString() {
+    return `${this.rank}${this.suit}`;
+  }
+
+  static fromString(str) {
+    if (!str || str.length !== 2) return null;
+    return new Card(str[0], str[1]);
+  }
+}
+
+// Individual action
+class Action {
+  constructor(actionNumber, playerId, action, amount, isAllin, cards) {
+    this.actionNumber = actionNumber;
+    this.playerId = playerId;
+    this.action = action; // fold, check, call, bet, raise
+    this.amount = amount;
+    this.isAllin = isAllin;
+    this.cards = cards;
+  }
+}
+
+// Pot information
+class Pot {
+  constructor(number, amount, rake = 0) {
+    this.number = number;
+    this.amount = amount;
+    this.rake = rake;
+    this.eligiblePlayers = [];
+    this.winners = [];
+  }
+}
+
+// Street (betting round)
+class Street {
+  constructor(name) {
+    this.name = name; // preflop, flop, turn, river
+    this.actions = [];
+    this.cards = []; // Community cards dealt this street
+    this.pot = 0;
+  }
+
+  addAction(action) {
+    this.actions.push(action);
+  }
+}
+
+
+
+export { Hand, Card, Action, Pot, Street };

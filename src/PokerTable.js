@@ -27,8 +27,8 @@ const PokerTable = () => {
   const [isDragging, setIsDragging] = useState(false);
   
   // Betting configuration
-  const [smallBlind, setSmallBlind] = useState(25);
-  const [bigBlind, setBigBlind] = useState(50);
+  const [smallBlind, setSmallBlind] = useState(5);
+  const [bigBlind, setBigBlind] = useState(10);
   const [ante, setAnte] = useState(0);
   const [bigBlindAnte, setBigBlindAnte] = useState(0);
   const [isTournament, setIsTournament] = useState(false);
@@ -466,65 +466,6 @@ const PokerTable = () => {
           </div>
         </div>
 
-        {/* Action section - positioned based on device */}
-        <div className={`action-section ${isMobile ? 'action-section-mobile' : 'action-section-desktop'}`}>
-          <div className="active-player-display">
-            Action: {players.find(p => p.isActive)?.name || 'None'}
-          </div>
-          
-          <div className="action-buttons">
-            <button 
-              className="action-button fold"
-              onClick={() => handleAction('fold')}
-            >
-              Fold
-            </button>
-            <button 
-              className="action-button call"
-              onClick={() => handleAction('call', bigBlind)}
-            >
-              Call ${bigBlind}
-            </button>
-            <button 
-              className="action-button raise"
-              onClick={() => handleAction('raise', bigBlind * 3)}
-            >
-              Raise to ${bigBlind * 3}
-            </button>
-          </div>
-
-          {/* Custom bet input */}
-          <div className="custom-bet-section">
-            <input 
-              type="number" 
-              placeholder="Custom bet"
-              className="custom-bet-input"
-              id="customBetInput"
-            />
-            <button 
-              className="action-button custom-bet"
-              onClick={() => {
-                const input = document.getElementById('customBetInput');
-                const amount = Number(input.value);
-                if (amount > 0) {
-                  handleAction('bet', amount);
-                  input.value = '';
-                }
-              }}
-            >
-              Bet
-            </button>
-          </div>
-
-          {/* Hand progress indicator */}
-          {recordingStarted && currentHand && (
-            <div className="hand-progress">
-              <div>Street: {currentHand.currentStreet}</div>
-              <div>Actions: {Object.values(currentHand.streets).reduce((sum, street) => sum + street.actions.length, 0)}</div>
-            </div>
-          )}
-        </div>
-        
         {/* Game info display */}
         <div className="game-info">
           {isTournament ? 'Tournament' : 'Cash Game'}<br/>

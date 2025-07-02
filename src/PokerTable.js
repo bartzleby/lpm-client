@@ -1,22 +1,32 @@
 import React, { useState } from 'react';
+import HeroBox from './HeroBox';
 import './PokerTable.css';
 
 const PokerTable = () => {
   const [players, setPlayers] = useState([
-    { id: 1, name: 'Hero', chips: 1500, position: 0, isActive: true },
-    { id: 2, name: 'Player 2', chips: 2300, position: 1, isActive: true },
-    { id: 3, name: 'Player 3', chips: 1800, position: 2, isActive: false },
-    { id: 4, name: 'Player 4', chips: 950, position: 3, isActive: true },
-    { id: 5, name: 'Player 5', chips: 3200, position: 4, isActive: true },
-    { id: 6, name: 'Player 6', chips: 1650, position: 5, isActive: true },
-    { id: 7, name: 'Player 7', chips: 780, position: 6, isActive: false },
-    { id: 8, name: 'Player 8', chips: 2100, position: 7, isActive: true },
-    { id: 9, name: 'Player 9', chips: 1425, position: 8, isActive: true }
+    { id: 1, name: 'You', chips: 1500, position: 0, isActive: true, hand: [] },
+    { id: 2, name: 'Player 2', chips: 2300, position: 1, isActive: true, hand: [] },
+    { id: 3, name: 'Player 3', chips: 1800, position: 2, isActive: false, hand: [] },
+    { id: 4, name: 'Player 4', chips: 950, position: 3, isActive: true, hand: [] },
+    { id: 5, name: 'Player 5', chips: 3200, position: 4, isActive: true, hand: [] },
+    { id: 6, name: 'Player 6', chips: 1650, position: 5, isActive: true, hand: [] },
+    { id: 7, name: 'Player 7', chips: 780, position: 6, isActive: false, hand: [] },
+    { id: 8, name: 'Player 8', chips: 2100, position: 7, isActive: true, hand: [] },
+    { id: 9, name: 'Player 9', chips: 1425, position: 8, isActive: true, hand: [] }
   ]);
 
-  const [pot, setPot] = useState(0);
+  const [pot, setPot] = useState(450);
   const [dealerPosition, setDealerPosition] = useState(2);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Update player data
+  const updatePlayer = (playerId, updates) => {
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => 
+        player.id === playerId ? { ...player, ...updates } : player
+      )
+    );
+  };
 
   // Handle dealer button drag
   const handleDealerDrag = (e) => {
@@ -87,41 +97,26 @@ const PokerTable = () => {
     }
   }, [isDragging, dealerPosition]);
 
-  // Calculate position for each player around the oval
-  const getPlayerPosition = (index) => {
-    const angle = (index * 360) / 9 + 90; // Start from bottom, +90 degrees offset
+  // Calculate dealer button position (for draggable dealer button)
+  const getDealerButtonPosition = () => {
+    const angle = (dealerPosition * 360) / 9 + 90;
     const radians = (angle * Math.PI) / 180;
-    const radiusX = 140; // Horizontal radius
-    const radiusY = 200; // Vertical radius (larger for oval)
+    const radiusX = 140;
+    const radiusY = 200;
     
     const x = Math.cos(radians) * radiusX;
     const y = Math.sin(radians) * radiusY;
     
     return {
-      left: `calc(50% + ${x}px)`,
+      left: `calc(50% + ${x}px + 25px)`, // Offset to right of player
       top: `calc(50% + ${y}px)`,
       transform: 'translate(-50%, -50%)'
     };
   };
 
-  // Calculate dealer button position offset from player position
-  const getDealerButtonPosition = (index) => {
-    const playerPos = getPlayerPosition(index);
-    
-    // Start from center of player circle, then move directly right to edge
-    const offsetX = 25; // Move right to the edge of the 28px radius circle (14px radius + some spacing)
-    const offsetY = 0;  // No vertical offset
-    
-    return {
-      left: `calc(${playerPos.left} + ${offsetX}px)`,
-      top: `calc(${playerPos.top} + ${offsetY}px)`,
-      transform: 'translate(-50%, -50%)'
-    };
-  };
-
   return (
-    <div className="poker-container">
-      <div className="poker-table-wrapper poker-table-container">
+    <div className="poker-wrapper">
+      <div className="poker-table-container">
         {/* Poker Table */}
         <div className="poker-table">
           {/* Table felt pattern */}
@@ -146,48 +141,22 @@ const PokerTable = () => {
           </div>
         </div>
 
-        {/* Players */}
+        {/* Players using HeroBox component - Note: No dealer button here */}
         {players.map((player, index) => (
-          <div
+          <HeroBox
             key={player.id}
-            className="player-position"
-            style={getPlayerPosition(index)}
-          >
-            {/* Player circle */}
-            <div className={`player-circle ${player.isActive ? 'active' : 'inactive'} ${index === 0 ? 'hero' : ''}`}>
-              {/* Player avatar */}
-              <div className="player-avatar">
-                {player.name === 'You' ? '👤' : '🎭'}
-              </div>
-              
-              {/* Chips indicator */}
-              <div className="player-chips">
-                ${player.chips}
-              </div>
-              
-              {/* Player name */}
-              <div className="player-name">
-                {player.name}
-              </div>
-              
-              {/* Action indicator */}
-              {player.isActive && (
-                <div className="action-indicator"></div>
-              )}
-            </div>
-            
-            {/* Player cards */}
-            <div className="player-cards">
-              <div className="player-card"></div>
-              <div className="player-card"></div>
-            </div>
-          </div>
+            player={player}
+            isHero={index === 0}
+            isDealer={false} // We don't show dealer in HeroBox since we have draggable
+            position={index}
+            onPlayerUpdate={(updates) => updatePlayer(player.id, updates)}
+          />
         ))}
 
-        {/* Dealer button */}
+        {/* Draggable dealer button */}
         <div 
-          className={`dealer-button ${isDragging ? 'dragging' : ''}`}
-          style={getDealerButtonPosition(dealerPosition)}
+          className={`draggable-dealer-button ${isDragging ? 'dragging' : ''}`}
+          style={getDealerButtonPosition()}
           onMouseDown={handleDealerStart}
           onTouchStart={handleDealerStart}
         >

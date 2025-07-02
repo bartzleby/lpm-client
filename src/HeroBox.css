@@ -1,0 +1,138 @@
+/* HeroBox.css */
+
+.hero-box-container {
+  position: absolute;
+}
+
+.player-circle {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  border-width: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+}
+
+.player-circle.active {
+  background-color: #475569;
+  border-color: #94a3b8;
+  box-shadow: 0 10px 15px -3px rgba(71, 85, 105, 0.3);
+}
+
+.player-circle.inactive {
+  background-color: #374151;
+  border-color: #64748b;
+}
+
+.player-circle.hero {
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.5);
+}
+
+.player-avatar {
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+}
+
+.player-chips {
+  position: absolute;
+  bottom: -0.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #57534e;
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid #78716c;
+  white-space: nowrap;
+}
+
+.player-name {
+  position: absolute;
+  top: -1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.action-indicator {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  width: 1rem;
+  height: 1rem;
+  background-color: #34d399;
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.dealer-button {
+  position: absolute;
+  right: -1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: white;
+  border: 2px solid #1f2937;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.player-cards {
+  position: absolute;
+  top: 4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.25rem;
+}
+
+.card {
+  width: 1rem;
+  height: 1.5rem;
+  border-radius: 0.125rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.card.face-up {
+  background-color: white;
+  border: 1px solid #d1d5db;
+}
+
+.card.face-down {
+  background-color: #dc2626;
+  border: 1px solid #b91c1c;
+}

@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import HeroBox from './HeroBox';
+import { Hand } from './Hand';
 import './PokerTable.css';
 
 const PokerTable = () => {
+  // Hand recording state
+  const [currentHand, setCurrentHand] = useState(null);
+  const [recordingStarted, setRecordingStarted] = useState(false);
+  const [handHistory, setHandHistory] = useState([]);
+
+  // Players state
   const [players, setPlayers] = useState([
-    { id: 1, name: 'You', chips: 1500, position: 0, isActive: false, hand: [], forcedBet: null },
+    { id: 1, name: 'Hero', chips: 1500, position: 0, isActive: false, hand: [], forcedBet: null },
     { id: 2, name: 'Player 2', chips: 2300, position: 1, isActive: false, hand: [], forcedBet: null },
     { id: 3, name: 'Player 3', chips: 1800, position: 2, isActive: false, hand: [], forcedBet: null },
     { id: 4, name: 'Player 4', chips: 950, position: 3, isActive: false, hand: [], forcedBet: null },
@@ -27,29 +34,109 @@ const PokerTable = () => {
   const [isTournament, setIsTournament] = useState(false);
   const [showConfig, setShowConfig] = useState(true);
 
-  // Calculate which player should be active (3 positions clockwise from dealer)
+  // UI state
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showExport, setShowExport] = useState(false);
+
+  // Check for mobile on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate positions
   const getActivePlayerPosition = (dealerPos) => {
     return (dealerPos + 3) % 9;
   };
 
-  // Calculate forced bet positions
   const getSmallBlindPosition = (dealerPos) => (dealerPos + 1) % 9;
   const getBigBlindPosition = (dealerPos) => (dealerPos + 2) % 9;
 
-  // Update active player and forced bets when dealer position or betting config changes
+  // Start recording a new hand
+  const startNewHand = () => {
+    const hand = new Hand();
+    
+    // Set game info
+    hand.tableName = "Live Game Table 1";
+    hand.gameType = "NLH";
+    hand.smallBlind = smallBlind;
+    hand.bigBlind = bigBlind;
+    hand.ante = ante;
+    hand.bigBlindAnte = bigBlindAnte;
+    hand.tableSize = 9;
+    
+    // Add active players to hand
+    players.forEach(player => {
+      if (player.chips > 0) {
+        hand.addPlayer(player.name, player.position + 1, player.chips);
+      }
+    });
+    
+    // Set hero and dealer
+    hand.setHero('Hero');
+    hand.setDealerSeat(dealerPosition + 1);
+    
+    // Post forced bets
+    const sbPos = getSmallBlindPosition(dealerPosition);
+    const bbPos = getBigBlindPosition(dealerPosition);
+    
+    const sbPlayer = players.find(p => p.position === sbPos);
+    const bbPlayer = players.find(p => p.position === bbPos);
+    
+    if (sbPlayer && smallBlind > 0) {
+      hand.postSmallBlind(sbPlayer.name);
+    }
+    if (bbPlayer && bigBlind > 0) {
+      hand.postBigBlind(bbPlayer.name);
+      if (isTournament && bigBlindAnte > 0) {
+        hand.postBigBlindAnte(bbPlayer.name);
+      }
+    }
+    
+    // Post antes if applicable
+    if (ante > 0) {
+      players.forEach(player => {
+        if (player.chips > 0) {
+          hand.postAnte(player.name);
+        }
+      });
+    }
+    
+    setCurrentHand(hand);
+    setRecordingStarted(true);
+  };
+
+  // Auto-start recording when dealer button is moved
+  useEffect(() => {
+    if (!recordingStarted && dealerPosition !== null) {
+      startNewHand();
+    }
+  }, [dealerPosition]);
+
+  // Update player data
+  const updatePlayer = (playerId, updates) => {
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => 
+        player.id === playerId ? { ...player, ...updates } : player
+      )
+    );
+  };
+
+  // Update active player and forced bets
   useEffect(() => {
     const activePosition = getActivePlayerPosition(dealerPosition);
     const sbPosition = getSmallBlindPosition(dealerPosition);
     const bbPosition = getBigBlindPosition(dealerPosition);
     
-    // Calculate total pot from forced bets
     let totalPot = 0;
     
     setPlayers(prevPlayers => 
       prevPlayers.map(player => {
         let forcedBet = null;
         
-        // Assign forced bets
         if (player.position === sbPosition && smallBlind > 0) {
           forcedBet = { type: 'SB', amount: smallBlind };
           totalPot += smallBlind;
@@ -58,7 +145,6 @@ const PokerTable = () => {
           totalPot += bigBlind;
         }
         
-        // Add ante if applicable
         if (ante > 0) {
           if (forcedBet) {
             forcedBet.ante = ante;
@@ -68,7 +154,6 @@ const PokerTable = () => {
           totalPot += ante;
         }
         
-        // Add big blind ante if tournament and this is BB position
         if (isTournament && bigBlindAnte > 0 && player.position === bbPosition) {
           if (forcedBet) {
             forcedBet.bbAnte = bigBlindAnte;
@@ -89,13 +174,26 @@ const PokerTable = () => {
     setPot(totalPot);
   }, [dealerPosition, smallBlind, bigBlind, ante, bigBlindAnte, isTournament]);
 
-  // Update player data
-  const updatePlayer = (playerId, updates) => {
-    setPlayers(prevPlayers => 
-      prevPlayers.map(player => 
-        player.id === playerId ? { ...player, ...updates } : player
-      )
-    );
+  // Handle action buttons
+  const handleAction = (actionType, amount = null) => {
+    if (!currentHand || !recordingStarted) {
+      alert('Please start recording a hand first');
+      return;
+    }
+
+    const activePlayer = players.find(p => p.isActive);
+    if (!activePlayer) return;
+
+    // Record action in hand
+    currentHand.addAction(activePlayer.name, actionType, amount);
+
+    // Update pot if amount specified
+    if (amount) {
+      setPot(prev => prev + amount);
+    }
+
+    // Move to next player
+    moveToNextPlayer();
   };
 
   // Move to next active player
@@ -104,7 +202,6 @@ const PokerTable = () => {
       const currentActiveIndex = prevPlayers.findIndex(player => player.isActive);
       if (currentActiveIndex === -1) return prevPlayers;
 
-      // Find next player position (clockwise)
       const nextPosition = (prevPlayers[currentActiveIndex].position + 1) % 9;
       
       return prevPlayers.map(player => ({
@@ -112,6 +209,33 @@ const PokerTable = () => {
         isActive: player.position === nextPosition
       }));
     });
+  };
+
+  // Export hand history
+  const exportHand = () => {
+    if (!currentHand) return;
+    
+    const validation = currentHand.validate();
+    if (!validation.valid) {
+      alert('Hand validation failed: ' + validation.errors.join(', '));
+      return;
+    }
+
+    const handJson = currentHand.toJSON();
+    const blob = new Blob([JSON.stringify(handJson, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hand_${currentHand.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    // Add to history
+    setHandHistory(prev => [...prev, currentHand]);
+    
+    // Reset for new hand
+    setCurrentHand(null);
+    setRecordingStarted(false);
   };
 
   // Handle dealer button drag
@@ -138,13 +262,9 @@ const PokerTable = () => {
     const deltaX = clientX - centerX;
     const deltaY = clientY - centerY;
     
-    // Calculate angle from center to mouse/touch position
     let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-    
-    // Adjust angle to match our player positioning (starting from bottom going clockwise)
     angle = (angle - 90 + 360) % 360;
     
-    // Convert to player position (9 positions around the table)
     const newPosition = Math.round(angle / 40) % 9;
     
     if (newPosition !== dealerPosition) {
@@ -163,7 +283,7 @@ const PokerTable = () => {
     setIsDragging(false);
   };
 
-  // Add event listeners for mouse/touch move and up
+  // Event listeners for dealer drag
   useEffect(() => {
     if (isDragging) {
       const handleMove = (e) => handleDealerDrag(e);
@@ -183,7 +303,6 @@ const PokerTable = () => {
     }
   }, [isDragging, dealerPosition]);
 
-  // Calculate dealer button position (for draggable dealer button)
   const getDealerButtonPosition = () => {
     const angle = (dealerPosition * 360) / 9 + 90;
     const radians = (angle * Math.PI) / 180;
@@ -194,87 +313,57 @@ const PokerTable = () => {
     const y = Math.sin(radians) * radiusY;
     
     return {
-      left: `calc(50% + ${x}px + 25px)`, // Offset to right of player
+      left: `calc(50% + ${x}px + 25px)`,
       top: `calc(50% + ${y}px)`,
       transform: 'translate(-50%, -50%)'
     };
   };
 
-  // Handle action buttons - move to next player after action
-  const handleAction = (action) => {
-    console.log(`Player performed action: ${action}`);
-    // Move to next player after action
-    moveToNextPlayer();
-  };
-
   return (
-    <div className="poker-wrapper" style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      overflow: 'hidden',
-      touchAction: 'none'
-    }}>
+    <div className={`poker-wrapper ${isMobile ? 'mobile' : 'desktop'}`}>
       {/* Configuration Panel */}
       {showConfig && (
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          left: '20px',
-          background: 'rgba(0, 0, 0, 0.9)',
-          color: 'white',
-          padding: '15px',
-          borderRadius: '8px',
-          fontSize: '14px',
-          zIndex: 100,
-          minWidth: '200px'
-        }}>
-          <div style={{ marginBottom: '10px', fontWeight: 'bold' }}>Game Configuration</div>
+        <div className="config-panel">
+          <div className="config-header">Game Configuration</div>
           
-          <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', marginBottom: '4px' }}>Small Blind:</label>
+          <div className="config-group">
+            <label>Small Blind:</label>
             <input
               type="number"
               value={smallBlind}
               onChange={(e) => setSmallBlind(Number(e.target.value))}
-              style={{ width: '80px', padding: '2px 4px', color: 'black' }}
             />
           </div>
           
-          <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', marginBottom: '4px' }}>Big Blind:</label>
+          <div className="config-group">
+            <label>Big Blind:</label>
             <input
               type="number"
               value={bigBlind}
               onChange={(e) => setBigBlind(Number(e.target.value))}
-              style={{ width: '80px', padding: '2px 4px', color: 'black' }}
             />
           </div>
           
-          <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'block', marginBottom: '4px' }}>Ante:</label>
+          <div className="config-group">
+            <label>Ante:</label>
             <input
               type="number"
               value={ante}
               onChange={(e) => setAnte(Number(e.target.value))}
-              style={{ width: '80px', padding: '2px 4px', color: 'black' }}
             />
           </div>
           
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px' }}>Big Blind Ante:</label>
+          <div className="config-group">
+            <label>Big Blind Ante:</label>
             <input
               type="number"
               value={bigBlindAnte}
               onChange={(e) => setBigBlindAnte(Number(e.target.value))}
-              style={{ width: '80px', padding: '2px 4px', color: 'black' }}
             />
           </div>
           
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="config-group">
+            <label>
               <input
                 type="checkbox"
                 checked={isTournament}
@@ -286,93 +375,103 @@ const PokerTable = () => {
           
           <button
             onClick={() => setShowConfig(false)}
-            style={{
-              background: '#059669',
-              color: 'white',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            className="config-apply-btn"
           >
             Apply & Close
           </button>
         </div>
       )}
 
-      {/* Settings button to reopen config */}
-      {!showConfig && (
-        <button
-          onClick={() => setShowConfig(true)}
-          style={{
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            background: '#374151',
-            color: 'white',
-            border: '1px solid #6b7280',
-            padding: '8px 12px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            zIndex: 100
-          }}
-        >
-          ⚙️ Settings
-        </button>
-      )}
+      {/* Main content wrapper */}
+      <div className={`main-content ${isMobile ? 'mobile-layout' : 'desktop-layout'}`}>
+        {/* Table section */}
+        <div className="table-section">
+          {/* Settings button */}
+          {!showConfig && (
+            <button
+              onClick={() => setShowConfig(true)}
+              className="settings-btn"
+            >
+              ⚙️ Settings
+            </button>
+          )}
 
-      <div className="poker-table-container">
-        {/* Poker Table */}
-        <div className="poker-table">
-          {/* Table felt pattern */}
-          <div className="table-felt"></div>
-          
-          {/* Table edge highlight */}
-          <div className="table-edge"></div>
-          
-          {/* Center pot area */}
-          <div className="pot-area">
-            <div className="pot-label">POT</div>
-            <div className="pot-amount">${pot}</div>
+          {/* Recording controls */}
+          <div className="recording-controls">
+            {recordingStarted && currentHand ? (
+              <>
+                <span className="recording-status">Recording Hand #{handHistory.length + 1}</span>
+                <button 
+                  onClick={exportHand}
+                  className="save-hand-btn"
+                >
+                  💾 Save Hand
+                </button>
+                <button 
+                  onClick={() => {
+                    setCurrentHand(null);
+                    setRecordingStarted(false);
+                  }}
+                  className="cancel-hand-btn"
+                >
+                  ✕ Cancel
+                </button>
+              </>
+            ) : (
+              <span className="recording-hint">Move dealer button to start recording</span>
+            )}
           </div>
-          
-          {/* Community cards area */}
-          <div className="community-cards">
-            {[1, 2, 3, 4, 5].map((card) => (
-              <div key={card} className="community-card">
-                <div className="community-card-placeholder">?</div>
+
+          <div className="poker-table-container">
+            {/* Poker Table */}
+            <div className="poker-table">
+              <div className="table-felt"></div>
+              <div className="table-edge"></div>
+              
+              <div className="pot-area">
+                <div className="pot-label">POT</div>
+                <div className="pot-amount">${pot}</div>
               </div>
+              
+              <div className="community-cards">
+                {[1, 2, 3, 4, 5].map((card) => (
+                  <div key={card} className="community-card">
+                    <div className="community-card-placeholder">?</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Players */}
+            {players.map((player, index) => (
+              <HeroBox
+                key={player.id}
+                player={player}
+                isHero={index === 0}
+                isDealer={false}
+                position={index}
+                onPlayerUpdate={(updates) => updatePlayer(player.id, updates)}
+              />
             ))}
+
+            {/* Draggable dealer button */}
+            <div 
+              className={`draggable-dealer-button ${isDragging ? 'dragging' : ''}`}
+              style={getDealerButtonPosition()}
+              onMouseDown={handleDealerStart}
+              onTouchStart={handleDealerStart}
+            >
+              D
+            </div>
           </div>
         </div>
 
-        {/* Players using HeroBox component */}
-        {players.map((player, index) => (
-          <HeroBox
-            key={player.id}
-            player={player}
-            isHero={index === 0}
-            isDealer={false}
-            position={index}
-            onPlayerUpdate={(updates) => updatePlayer(player.id, updates)}
-          />
-        ))}
-
-        {/* Draggable dealer button */}
-        <div 
-          className={`draggable-dealer-button ${isDragging ? 'dragging' : ''}`}
-          style={getDealerButtonPosition()}
-          onMouseDown={handleDealerStart}
-          onTouchStart={handleDealerStart}
-        >
-          D
-        </div>
-        
-        {/* Action buttons section - moved below players */}
-        <div className="action-section">
+        {/* Action section - positioned based on device */}
+        <div className={`action-section ${isMobile ? 'action-section-mobile' : 'action-section-desktop'}`}>
           <div className="active-player-display">
             Action: {players.find(p => p.isActive)?.name || 'None'}
           </div>
+          
           <div className="action-buttons">
             <button 
               className="action-button fold"
@@ -382,31 +481,52 @@ const PokerTable = () => {
             </button>
             <button 
               className="action-button call"
-              onClick={() => handleAction('call')}
+              onClick={() => handleAction('call', bigBlind)}
             >
-              Call
+              Call ${bigBlind}
             </button>
             <button 
               className="action-button raise"
-              onClick={() => handleAction('raise')}
+              onClick={() => handleAction('raise', bigBlind * 3)}
             >
-              Raise
+              Raise to ${bigBlind * 3}
             </button>
           </div>
+
+          {/* Custom bet input */}
+          <div className="custom-bet-section">
+            <input 
+              type="number" 
+              placeholder="Custom bet"
+              className="custom-bet-input"
+              id="customBetInput"
+            />
+            <button 
+              className="action-button custom-bet"
+              onClick={() => {
+                const input = document.getElementById('customBetInput');
+                const amount = Number(input.value);
+                if (amount > 0) {
+                  handleAction('bet', amount);
+                  input.value = '';
+                }
+              }}
+            >
+              Bet
+            </button>
+          </div>
+
+          {/* Hand progress indicator */}
+          {recordingStarted && currentHand && (
+            <div className="hand-progress">
+              <div>Street: {currentHand.currentStreet}</div>
+              <div>Actions: {Object.values(currentHand.streets).reduce((sum, street) => sum + street.actions.length, 0)}</div>
+            </div>
+          )}
         </div>
         
         {/* Game info display */}
-        <div style={{
-          position: 'absolute',
-          bottom: '10px',
-          right: '10px',
-          color: 'white',
-          fontSize: '12px',
-          background: 'rgba(0,0,0,0.7)',
-          padding: '5px',
-          borderRadius: '3px',
-          textAlign: 'right'
-        }}>
+        <div className="game-info">
           {isTournament ? 'Tournament' : 'Cash Game'}<br/>
           SB: ${smallBlind} | BB: ${bigBlind}
           {ante > 0 && <><br/>Ante: ${ante}</>}

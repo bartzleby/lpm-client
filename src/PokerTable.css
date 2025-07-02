@@ -1,4 +1,4 @@
-/* PokerTable.css */
+/* PokerTable.css - Updated with responsive layout */
 
 .poker-wrapper {
   min-height: 100vh;
@@ -6,8 +6,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  /* Mobile fixes */
   position: fixed;
   top: 0;
   left: 0;
@@ -19,19 +17,221 @@
   overscroll-behavior: none;
 }
 
+/* Main content layout */
+.main-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  position: relative;
+}
+
+/* Desktop layout - action section on the right */
+.main-content.desktop-layout {
+  flex-direction: row;
+}
+
+.main-content.desktop-layout .table-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.main-content.desktop-layout .action-section-desktop {
+  width: 300px;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-left: 1px solid #374151;
+}
+
+/* Mobile layout - action section at bottom */
+.main-content.mobile-layout {
+  flex-direction: column;
+}
+
+.main-content.mobile-layout .table-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.main-content.mobile-layout .action-section-mobile {
+  background: rgba(0, 0, 0, 0.95);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid #374151;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+/* Table section adjustments */
+.table-section {
+  position: relative;
+}
+
+/* Configuration panel */
+.config-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #374151;
+  z-index: 200;
+  min-width: 250px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.config-header {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  color: #60a5fa;
+}
+
+.config-group {
+  margin-bottom: 0.75rem;
+}
+
+.config-group label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: #d1d5db;
+}
+
+.config-group input[type="number"] {
+  width: 100px;
+  padding: 0.375rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #1f2937;
+  color: white;
+  font-size: 0.875rem;
+}
+
+.config-group input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+.config-apply-btn {
+  background: #059669;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.config-apply-btn:hover {
+  background: #047857;
+}
+
+/* Settings button */
+.settings-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: #374151;
+  color: white;
+  border: 1px solid #6b7280;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 150;
+  font-size: 0.875rem;
+}
+
+.settings-btn:hover {
+  background: #4b5563;
+}
+
+/* Recording controls */
+.recording-controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 150;
+}
+
+.recording-status {
+  background: rgba(0, 0, 0, 0.8);
+  color: #60a5fa;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  border: 1px solid #374151;
+}
+
+.recording-hint {
+  background: rgba(0, 0, 0, 0.7);
+  color: #9ca3af;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+.save-hand-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.save-hand-btn:hover {
+  background: #059669;
+}
+
+.cancel-hand-btn {
+  background: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.cancel-hand-btn:hover {
+  background: #4b5563;
+}
+
+/* Poker table styles */
 .poker-table-container {
   position: relative;
   width: 100%;
   max-width: 24rem;
   margin: 0 auto;
+  margin-top: -2rem; /* Move table up to show Hero better */
   aspect-ratio: 3/4;
-  /* Prevent touch scrolling */
   touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
-  -khtml-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
 }
 
@@ -45,7 +245,6 @@
   border-radius: 50%;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   border: 8px solid #57534e;
-  /* Prevent touch interactions from bubbling */
   touch-action: none;
 }
 
@@ -58,7 +257,6 @@
   background-color: #047857;
   border-radius: 50%;
   opacity: 0.9;
-  /* Prevent touch scrolling */
   touch-action: none;
 }
 
@@ -146,7 +344,6 @@
   cursor: pointer;
   user-select: none;
   transition: transform 150ms;
-  /* Allow touch for dragging */
   touch-action: manipulation;
 }
 
@@ -160,49 +357,41 @@
   z-index: 50;
 }
 
+/* Action section styles */
 .action-section {
-  position: absolute;
-  bottom: 0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  /* Allow touch for buttons */
   touch-action: manipulation;
 }
 
 .active-player-display {
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(31, 41, 55, 0.95);
   color: white;
-  padding: 0.375rem 0.75rem;
+  padding: 0.75rem 1rem;
   border-radius: 0.5rem;
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: bold;
   border: 1px solid #374151;
-  min-width: 120px;
   text-align: center;
 }
 
 .action-buttons {
   display: flex;
   gap: 0.5rem;
+  justify-content: center;
 }
 
 .action-button {
-  padding: 0.25rem 0.75rem;
+  padding: 0.5rem 1rem;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: bold;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  transition: background-color 150ms;
+  transition: all 150ms;
   border: none;
   cursor: pointer;
   color: white;
-  /* Allow touch for buttons */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
 }
 
 .action-button.fold {
@@ -229,26 +418,131 @@
   background-color: #047857;
 }
 
-/* Additional mobile-specific styles */
+.action-button.custom-bet {
+  background-color: #3b82f6;
+}
+
+.action-button.custom-bet:hover {
+  background-color: #2563eb;
+}
+
+/* Custom bet section */
+.custom-bet-section {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-bet-input {
+  width: 120px;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid #374151;
+  background: #1f2937;
+  color: white;
+  font-size: 0.875rem;
+}
+
+/* Hand progress indicator */
+.hand-progress {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  color: #93bbfc;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.hand-progress div {
+  margin: 0.25rem 0;
+}
+
+/* Game info display */
+.game-info {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  color: white;
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  text-align: right;
+  border: 1px solid #374151;
+}
+
+/* Mobile specific adjustments */
 @media (max-width: 768px) {
   .poker-wrapper {
     padding: 0.5rem;
-    padding-bottom: 6rem; /* Extra space for action section */
+    padding-bottom: 200px; /* Space for action section */
   }
   
   .poker-table-container {
     max-width: 90vw;
-    max-height: 75vh; /* Reduced to make room for action section */
+    max-height: 60vh;
+    margin-top: -1rem; /* Less negative margin on mobile */
+  }
+  
+  .config-panel {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    padding: 1rem;
+  }
+  
+  .settings-btn {
+    top: 10px;
+    left: 10px;
+  }
+  
+  .recording-controls {
+    top: 10px;
+    right: 10px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+  
+  .recording-controls button,
+  .recording-controls span {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+  }
+  
+  .game-info {
+    bottom: auto;
+    top: 60px;
+    right: 10px;
+    font-size: 0.625rem;
+  }
+}
+
+/* Desktop specific adjustments */
+@media (min-width: 769px) {
+  .poker-table-container {
+    max-width: 32rem;
+  }
+  
+  .action-section-desktop {
+    overflow-y: auto;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
   }
   
   .action-button {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    min-height: 44px; /* Better touch targets */
+    width: 100%;
   }
   
-  .active-player-display {
-    font-size: 1rem;
-    padding: 0.5rem 1rem;
+  .custom-bet-section {
+    flex-direction: column;
+  }
+  
+  .custom-bet-input {
+    width: 100%;
   }
 }

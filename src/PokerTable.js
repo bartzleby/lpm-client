@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import './PokerTable.css';
 
 const PokerTable = () => {
   const [players, setPlayers] = useState([
-    { id: 1, name: 'You', chips: 1500, position: 0, isActive: true },
+    { id: 1, name: 'Hero', chips: 1500, position: 0, isActive: true },
     { id: 2, name: 'Player 2', chips: 2300, position: 1, isActive: true },
     { id: 3, name: 'Player 3', chips: 1800, position: 2, isActive: false },
     { id: 4, name: 'Player 4', chips: 950, position: 3, isActive: true },
@@ -13,7 +14,7 @@ const PokerTable = () => {
     { id: 9, name: 'Player 9', chips: 1425, position: 8, isActive: true }
   ]);
 
-  const [pot, setPot] = useState(450);
+  const [pot, setPot] = useState(0);
   const [dealerPosition, setDealerPosition] = useState(2);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -119,30 +120,27 @@ const PokerTable = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-700 to-slate-800 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-sm mx-auto aspect-[3/4] poker-table-container">
+    <div className="poker-container">
+      <div className="poker-table-wrapper poker-table-container">
         {/* Poker Table */}
-        <div className="absolute inset-4 bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-full shadow-2xl border-8 border-stone-600">
+        <div className="poker-table">
           {/* Table felt pattern */}
-          <div className="absolute inset-2 bg-emerald-700 rounded-full opacity-90"></div>
+          <div className="table-felt"></div>
           
           {/* Table edge highlight */}
-          <div className="absolute inset-1 border-2 border-stone-500 rounded-full opacity-60"></div>
+          <div className="table-edge"></div>
           
           {/* Center pot area */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-emerald-900 rounded-full w-20 h-16 border-2 border-stone-600 flex flex-col items-center justify-center shadow-inner">
-            <div className="text-stone-300 text-xs font-bold">POT</div>
-            <div className="text-white text-sm font-bold">${pot}</div>
+          <div className="pot-area">
+            <div className="pot-label">POT</div>
+            <div className="pot-amount">${pot}</div>
           </div>
           
           {/* Community cards area */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 translate-y-8 flex space-x-1">
+          <div className="community-cards">
             {[1, 2, 3, 4, 5].map((card) => (
-              <div 
-                key={card} 
-                className="w-6 h-8 bg-white border border-gray-300 rounded-sm shadow-md flex items-center justify-center"
-              >
-                <div className="text-xs text-gray-400">?</div>
+              <div key={card} className="community-card">
+                <div className="community-card-placeholder">?</div>
               </div>
             ))}
           </div>
@@ -152,50 +150,43 @@ const PokerTable = () => {
         {players.map((player, index) => (
           <div
             key={player.id}
-            className="absolute"
+            className="player-position"
             style={getPlayerPosition(index)}
           >
             {/* Player circle */}
-            <div className={`
-              w-14 h-14 rounded-full border-4 flex flex-col items-center justify-center text-center relative
-              ${player.isActive 
-                ? 'bg-slate-600 border-slate-400 shadow-lg shadow-slate-500/30' 
-                : 'bg-slate-700 border-slate-500'
-              }
-              ${index === 0 ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
-            `}>
+            <div className={`player-circle ${player.isActive ? 'active' : 'inactive'} ${index === 0 ? 'hero' : ''}`}>
               {/* Player avatar */}
-              <div className="text-white text-xs font-bold mb-1">
+              <div className="player-avatar">
                 {player.name === 'You' ? '👤' : '🎭'}
               </div>
               
               {/* Chips indicator */}
-              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-stone-600 text-white text-xs px-1 py-0.5 rounded-full border border-stone-500 min-w-max">
+              <div className="player-chips">
                 ${player.chips}
               </div>
               
               {/* Player name */}
-              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-white text-xs font-semibold whitespace-nowrap bg-black bg-opacity-50 px-1 rounded">
+              <div className="player-name">
                 {player.name}
               </div>
               
               {/* Action indicator */}
               {player.isActive && (
-                <div className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white animate-pulse"></div>
+                <div className="action-indicator"></div>
               )}
             </div>
             
             {/* Player cards */}
-            <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex space-x-1">
-              <div className="w-4 h-6 bg-red-600 border border-red-700 rounded-sm shadow-sm"></div>
-              <div className="w-4 h-6 bg-red-600 border border-red-700 rounded-sm shadow-sm"></div>
+            <div className="player-cards">
+              <div className="player-card"></div>
+              <div className="player-card"></div>
             </div>
           </div>
         ))}
 
         {/* Dealer button */}
         <div 
-          className={`absolute w-6 h-6 bg-white border-2 border-gray-800 rounded-full flex items-center justify-center text-xs font-bold shadow-lg cursor-pointer select-none transition-transform duration-150 ${isDragging ? 'scale-110 shadow-xl z-50' : 'hover:scale-105'}`}
+          className={`dealer-button ${isDragging ? 'dragging' : ''}`}
           style={getDealerButtonPosition(dealerPosition)}
           onMouseDown={handleDealerStart}
           onTouchStart={handleDealerStart}
@@ -204,14 +195,14 @@ const PokerTable = () => {
         </div>
         
         {/* Action buttons for user */}
-        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-2">
-          <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg transition-colors">
+        <div className="action-buttons">
+          <button className="action-button fold">
             Fold
           </button>
-          <button className="bg-stone-600 hover:bg-stone-700 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg transition-colors">
+          <button className="action-button call">
             Call
           </button>
-          <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg transition-colors">
+          <button className="action-button raise">
             Raise
           </button>
         </div>

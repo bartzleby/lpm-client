@@ -12,15 +12,15 @@ const PokerTable = () => {
 
   // Players state
   const [players, setPlayers] = useState([
-    { id: 1, name: 'Hero', chips: 1500, position: 0, isActive: false, hand: [], forcedBet: null },
-    { id: 2, name: 'Player 2', chips: 2300, position: 1, isActive: false, hand: [], forcedBet: null },
-    { id: 3, name: 'Player 3', chips: 1800, position: 2, isActive: false, hand: [], forcedBet: null },
-    { id: 4, name: 'Player 4', chips: 950, position: 3, isActive: false, hand: [], forcedBet: null },
-    { id: 5, name: 'Player 5', chips: 3200, position: 4, isActive: false, hand: [], forcedBet: null },
-    { id: 6, name: 'Player 6', chips: 1650, position: 5, isActive: false, hand: [], forcedBet: null },
-    { id: 7, name: 'Player 7', chips: 780, position: 6, isActive: false, hand: [], forcedBet: null },
-    { id: 8, name: 'Player 8', chips: 2100, position: 7, isActive: false, hand: [], forcedBet: null },
-    { id: 9, name: 'Player 9', chips: 1425, position: 8, isActive: false, hand: [], forcedBet: null }
+    { id: 1, name: 'Hero', chips: 1500, position: 0, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 2, name: 'Player 2', chips: 2300, position: 1, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 3, name: 'Player 3', chips: 1800, position: 2, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 4, name: 'Player 4', chips: 950, position: 3, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 5, name: 'Player 5', chips: 3200, position: 4, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 6, name: 'Player 6', chips: 1650, position: 5, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 7, name: 'Player 7', chips: 780, position: 6, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 8, name: 'Player 8', chips: 2100, position: 7, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false },
+    { id: 9, name: 'Player 9', chips: 1425, position: 8, isActive: false, hand: [], forcedBet: null, isFolded: false, isAnimatingFold: false }
   ]);
 
   const [pot, setPot] = useState(0);
@@ -58,7 +58,30 @@ const PokerTable = () => {
 
   // Get current active player
   const getCurrentPlayer = () => {
-    return players.find(player => player.isActive);
+    return players.find(player => player.isActive && !player.isFolded);
+  };
+
+  // Get remaining players count
+  const getRemainingPlayersCount = () => {
+    return players.filter(player => !player.isFolded).length;
+  };
+
+  // Helper function to find next active player position
+  const getNextActivePlayerPosition = (currentPosition) => {
+    let nextPosition = (currentPosition + 1) % 9;
+    let attempts = 0;
+    
+    // Keep looking for next non-folded player
+    while (attempts < 9) {
+      const nextPlayer = players.find(p => p.position === nextPosition);
+      if (nextPlayer && !nextPlayer.isFolded) {
+        return nextPosition;
+      }
+      nextPosition = (nextPosition + 1) % 9;
+      attempts++;
+    }
+    
+    return currentPosition; // Fallback if no active players found
   };
 
   // Start recording a new hand
@@ -171,7 +194,7 @@ const PokerTable = () => {
         
         return {
           ...player,
-          isActive: player.position === activePosition,
+          isActive: player.position === activePosition && !player.isFolded,
           forcedBet
         };
       })
@@ -187,18 +210,50 @@ const PokerTable = () => {
       return;
     }
 
-    const activePlayer = players.find(p => p.isActive);
+    const activePlayer = players.find(p => p.isActive && !p.isFolded);
     if (!activePlayer) return;
 
     // Record action in hand
     currentHand.addAction(activePlayer.name, actionType, amount);
+
+    // Handle fold action
+    if (actionType === 'fold') {
+      // Find next player position before updating state
+      const nextPlayerPosition = getNextActivePlayerPosition(activePlayer.position);
+      
+      // Start fold animation, mark as folded, and move to next player all at once
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => {
+          if (player.id === activePlayer.id) {
+            return { ...player, isAnimatingFold: true, isActive: false };
+          } else if (player.position === nextPlayerPosition) {
+            return { ...player, isActive: true };
+          } else {
+            return { ...player, isActive: false };
+          }
+        })
+      );
+
+      // Complete the fold after animation
+      setTimeout(() => {
+        setPlayers(prevPlayers => 
+          prevPlayers.map(player => 
+            player.id === activePlayer.id 
+              ? { ...player, isFolded: true, isAnimatingFold: false }
+              : player
+          )
+        );
+      }, 800);
+      
+      return;
+    }
 
     // Update pot if amount specified
     if (amount) {
       setPot(prev => prev + amount);
     }
 
-    // Move to next player
+    // Move to next player for all other actions
     moveToNextPlayer();
   };
 
@@ -208,11 +263,23 @@ const PokerTable = () => {
       const currentActiveIndex = prevPlayers.findIndex(player => player.isActive);
       if (currentActiveIndex === -1) return prevPlayers;
 
-      const nextPosition = (prevPlayers[currentActiveIndex].position + 1) % 9;
+      // Find next non-folded player
+      let nextPosition = (prevPlayers[currentActiveIndex].position + 1) % 9;
+      let attempts = 0;
+      
+      // Keep looking for next active player (not folded)
+      while (attempts < 9) {
+        const nextPlayer = prevPlayers.find(p => p.position === nextPosition);
+        if (nextPlayer && !nextPlayer.isFolded) {
+          break;
+        }
+        nextPosition = (nextPosition + 1) % 9;
+        attempts++;
+      }
       
       return prevPlayers.map(player => ({
         ...player,
-        isActive: player.position === nextPosition
+        isActive: player.position === nextPosition && !player.isFolded
       }));
     });
   };
@@ -474,7 +541,8 @@ const PokerTable = () => {
           {/* Game info display */}
           <div className="game-info">
             {isTournament ? 'Tournament' : 'Cash Game'}<br/>
-            SB: ${smallBlind} | BB: ${bigBlind}
+            SB: ${smallBlind} | BB: ${bigBlind}<br/>
+            Players: {getRemainingPlayersCount()}
             {ante > 0 && <><br/>Ante: ${ante}</>}
             {isTournament && bigBlindAnte > 0 && <><br/>BB Ante: ${bigBlindAnte}</>}
           </div>

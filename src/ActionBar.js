@@ -89,16 +89,6 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind })
           </button>
         </div>
       )}
-      
-      <div className="hand-progress">
-        <div>Pot: ${pot}</div>
-        {hand && (
-          <>
-            <div>Hand #{hand.GameNumber || 'Active'}</div>
-            <div>Players: {hand.players?.length || 0}</div>
-          </>
-        )}
-      </div>
     </div>
   );
 }

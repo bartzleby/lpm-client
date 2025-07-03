@@ -48,13 +48,32 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
         return display.join(' + ');
     };
 
+    // Determine player circle class
+    const getPlayerCircleClass = () => {
+        let baseClass = 'player-circle';
+        
+        if (player.isFolded) {
+            baseClass += ' folded';
+        } else if (player.isActive) {
+            baseClass += ' active';
+        } else {
+            baseClass += ' inactive';
+        }
+        
+        if (isHero) {
+            baseClass += ' hero';
+        }
+        
+        return baseClass;
+    };
+
     return (
         <div
             className="hero-box-container"
             style={getPlayerPosition()}
         >
             {/* Player circle */}
-            <div className={`player-circle ${player.isActive ? 'active' : 'inactive'} ${isHero ? 'hero' : ''}`}>
+            <div className={getPlayerCircleClass()}>
                 {/* Player avatar */}
                 <div className="player-avatar">
                     {isHero ? '👤' : '🎭'}
@@ -70,8 +89,8 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
                     {player.name}
                 </div>
                 
-                {/* Action indicator */}
-                {player.isActive && (
+                {/* Action indicator - only show if active and not folded */}
+                {player.isActive && !player.isFolded && (
                     <div className="action-indicator"></div>
                 )}
 
@@ -83,15 +102,15 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
                 )}
             </div>
             
-            {/* Forced bet indicator */}
-            {player.forcedBet && (
+            {/* Forced bet indicator - hide if folded */}
+            {player.forcedBet && !player.isFolded && (
                 <div className="forced-bet">
                     {formatForcedBet(player.forcedBet)}
                 </div>
             )}
             
             {/* Player cards */}
-            <div className="player-cards">
+            <div className={`player-cards ${player.isAnimatingFold ? 'folding' : ''} ${player.isFolded ? 'folded' : ''}`}>
                 {player.hand && player.hand.length > 0 ? (
                     // Show actual cards if we have them
                     player.hand.map((card, index) => (
@@ -100,11 +119,13 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
                         </div>
                     ))
                 ) : (
-                    // Show card backs
-                    <>
-                        <div className="card face-down"></div>
-                        <div className="card face-down"></div>
-                    </>
+                    // Show card backs only if not folded
+                    !player.isFolded && (
+                        <>
+                            <div className="card face-down"></div>
+                            <div className="card face-down"></div>
+                        </>
+                    )
                 )}
             </div>
         </div>

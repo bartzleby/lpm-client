@@ -14,6 +14,34 @@
   text-align: center;
 }
 
+.active-player-display.hand-over {
+  background-color: rgba(16, 185, 129, 0.95);
+  border-color: #10b981;
+  color: white;
+  font-size: 1.1rem;
+  animation: celebration 2s ease-in-out infinite;
+}
+
+.action-button.save-hand {
+  background-color: #10b981;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+}
+
+.action-button.save-hand:hover {
+  background-color: #059669;
+}
+
+@keyframes celebration {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
 .action-buttons {
   display: flex;
   gap: 0.5rem;

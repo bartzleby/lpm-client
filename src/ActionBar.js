@@ -1,9 +1,28 @@
 import React, { useState } from 'react';
 import './ActionBar.css';
 
-function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind }) {
+function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, isHandOver, winningPlayer, onSaveHand }) {
   const [customBetAmount, setCustomBetAmount] = useState('');
   const [showCustomBet, setShowCustomBet] = useState(false);
+
+  // If hand is over, show winning message and save option
+  if (isHandOver && winningPlayer) {
+    return (
+      <div className="action-section">
+        <div className="active-player-display hand-over">
+          🎉 {winningPlayer.name} wins ${pot}!
+        </div>
+        <div className="action-buttons">
+          <button 
+            className="action-button save-hand"
+            onClick={onSaveHand}
+          >
+            💾 Save Hand
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentPlayer) {
     return (

@@ -66,6 +66,17 @@ const PokerTable = () => {
     return players.filter(player => !player.isFolded).length;
   };
 
+  // Check if hand is over (only one player remaining)
+  const isHandOver = () => {
+    return getRemainingPlayersCount() <= 1;
+  };
+
+  // Get the winning player (last remaining player)
+  const getWinningPlayer = () => {
+    const remainingPlayers = players.filter(player => !player.isFolded);
+    return remainingPlayers.length === 1 ? remainingPlayers[0] : null;
+  };
+
   // Helper function to find next active player position
   const getNextActivePlayerPosition = (currentPosition) => {
     let nextPosition = (currentPosition + 1) % 9;
@@ -82,6 +93,25 @@ const PokerTable = () => {
     }
     
     return currentPosition; // Fallback if no active players found
+  };
+
+  // Calculate initial pot from forced bets
+  const calculateInitialPot = () => {
+    let totalPot = 0;
+    
+    // Add small blind and big blind
+    totalPot += smallBlind + bigBlind;
+    
+    // Add antes (one ante per player)
+    const activePlayers = players.filter(player => player.chips > 0);
+    totalPot += ante * activePlayers.length;
+    
+    // Add big blind ante if tournament
+    if (isTournament && bigBlindAnte > 0) {
+      totalPot += bigBlindAnte;
+    }
+    
+    return totalPot;
   };
 
   // Start recording a new hand
@@ -108,12 +138,46 @@ const PokerTable = () => {
     hand.setHero('Hero');
     hand.setDealerSeat(dealerPosition + 1);
     
-    // Post forced bets
+    // Post forced bets and deduct from chip stacks
     const sbPos = getSmallBlindPosition(dealerPosition);
     const bbPos = getBigBlindPosition(dealerPosition);
     
     const sbPlayer = players.find(p => p.position === sbPos);
     const bbPlayer = players.find(p => p.position === bbPos);
+    
+    // Update chip stacks for forced bets
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => {
+        let newChips = player.chips;
+        
+        // Deduct small blind
+        if (player.position === sbPos && smallBlind > 0) {
+          newChips -= smallBlind;
+        }
+        
+        // Deduct big blind
+        if (player.position === bbPos && bigBlind > 0) {
+          newChips -= bigBlind;
+        }
+        
+        // Deduct ante
+        if (ante > 0 && player.chips > 0) {
+          newChips -= ante;
+        }
+        
+        // Deduct big blind ante
+        if (isTournament && bigBlindAnte > 0 && player.position === bbPos) {
+          newChips -= bigBlindAnte;
+        }
+        
+        return {
+          ...player,
+          chips: Math.max(0, newChips),
+          isFolded: false,
+          isAnimatingFold: false
+        };
+      })
+    );
     
     if (sbPlayer && smallBlind > 0) {
       hand.postSmallBlind(sbPlayer.name);
@@ -160,18 +224,14 @@ const PokerTable = () => {
     const sbPosition = getSmallBlindPosition(dealerPosition);
     const bbPosition = getBigBlindPosition(dealerPosition);
     
-    let totalPot = 0;
-    
     setPlayers(prevPlayers => 
       prevPlayers.map(player => {
         let forcedBet = null;
         
         if (player.position === sbPosition && smallBlind > 0) {
           forcedBet = { type: 'SB', amount: smallBlind };
-          totalPot += smallBlind;
         } else if (player.position === bbPosition && bigBlind > 0) {
           forcedBet = { type: 'BB', amount: bigBlind };
-          totalPot += bigBlind;
         }
         
         if (ante > 0) {
@@ -180,7 +240,6 @@ const PokerTable = () => {
           } else {
             forcedBet = { type: 'ANTE', amount: ante };
           }
-          totalPot += ante;
         }
         
         if (isTournament && bigBlindAnte > 0 && player.position === bbPosition) {
@@ -189,7 +248,6 @@ const PokerTable = () => {
           } else {
             forcedBet = { type: 'BB_ANTE', amount: bigBlindAnte };
           }
-          totalPot += bigBlindAnte;
         }
         
         return {
@@ -200,7 +258,8 @@ const PokerTable = () => {
       })
     );
     
-    setPot(totalPot);
+    // Set initial pot with forced bets
+    setPot(calculateInitialPot());
   }, [dealerPosition, smallBlind, bigBlind, ante, bigBlindAnte, isTournament]);
 
   // Handle action buttons
@@ -236,21 +295,41 @@ const PokerTable = () => {
 
       // Complete the fold after animation
       setTimeout(() => {
-        setPlayers(prevPlayers => 
-          prevPlayers.map(player => 
+        setPlayers(prevPlayers => {
+          const updatedPlayers = prevPlayers.map(player => 
             player.id === activePlayer.id 
               ? { ...player, isFolded: true, isAnimatingFold: false }
               : player
-          )
-        );
+          );
+          
+          // Check if hand is over after this fold
+          const remainingCount = updatedPlayers.filter(p => !p.isFolded).length;
+          if (remainingCount <= 1) {
+            // Hand is over, deactivate all players
+            return updatedPlayers.map(player => ({ ...player, isActive: false }));
+          }
+          
+          return updatedPlayers;
+        });
       }, 800);
       
       return;
     }
 
-    // Update pot if amount specified
-    if (amount) {
-      setPot(prev => prev + amount);
+    // Handle actions that involve money (call, raise, bet)
+    if (actionType === 'call' || actionType === 'raise' || actionType === 'bet') {
+      const actionAmount = amount || 0;
+      
+      // Update pot and player's chip stack
+      setPot(prev => prev + actionAmount);
+      
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => 
+          player.id === activePlayer.id 
+            ? { ...player, chips: Math.max(0, player.chips - actionAmount) }
+            : player
+        )
+      );
     }
 
     // Move to next player for all other actions
@@ -557,6 +636,9 @@ const PokerTable = () => {
             pot={pot}
             bigBlind={bigBlind}
             smallBlind={smallBlind}
+            isHandOver={isHandOver()}
+            winningPlayer={getWinningPlayer()}
+            onSaveHand={exportHand}
           />
         </div>
       </div>

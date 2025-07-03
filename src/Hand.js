@@ -147,34 +147,22 @@ class Hand {
   }
 }
 
-
-
-// Card representation
-class Card {
-  constructor(rank, suit) {
-    this.rank = rank; // 2-9, T, J, Q, K, A
-    this.suit = suit; // c, d, h, s
-  }
-
-  toString() {
-    return `${this.rank}${this.suit}`;
-  }
-
-  static fromString(str) {
-    if (!str || str.length !== 2) return null;
-    return new Card(str[0], str[1]);
-  }
-}
-
 // Individual action
 class Action {
   constructor(actionNumber, playerId, action, amount, isAllin, cards) {
     this.actionNumber = actionNumber;
     this.playerId = playerId;
-    this.action = action; // fold, check, call, bet, raise
+    this.action = action; // fold, check, call, bet, raise, post sb, post bb, post ante, dealt cards, post bb ante
     this.amount = amount;
     this.isAllin = isAllin;
     this.cards = cards;
+  }
+}
+
+class BetLimit {
+  constructor(betType, betCap) {
+    this.betType = betType;
+    this.betCap = betCap;
   }
 }
 
@@ -184,8 +172,19 @@ class Pot {
     this.number = number;
     this.amount = amount;
     this.rake = rake;
-    this.eligiblePlayers = [];
-    this.winners = [];
+    this.jackpot = 0.0;
+    this.playerWins = [];
+  }
+}
+
+class PlayerWin {
+  constructor(pid, amt) {
+    this.player_id = pid;
+	  this.win_amount = amt;
+	  this.cashout_amount = 0.0;
+	  this.cashout_fee = 0.0;
+	  this.bonus_amount = 0.0;
+	  this.contributed_rake = 0.0;
   }
 }
 
@@ -205,4 +204,4 @@ class Street {
 
 
 
-export { Hand, Card, Action, Pot, Street };
+export { Hand, Action, BetLimit, Pot, Street };

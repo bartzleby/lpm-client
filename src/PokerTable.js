@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import HeroBox from './HeroBox';
+import ActionBar from './ActionBar';
 import { Hand } from './Hand';
 import './PokerTable.css';
 
@@ -54,6 +55,11 @@ const PokerTable = () => {
 
   const getSmallBlindPosition = (dealerPos) => (dealerPos + 1) % 9;
   const getBigBlindPosition = (dealerPos) => (dealerPos + 2) % 9;
+
+  // Get current active player
+  const getCurrentPlayer = () => {
+    return players.find(player => player.isActive);
+  };
 
   // Start recording a new hand
   const startNewHand = () => {
@@ -464,14 +470,26 @@ const PokerTable = () => {
               D
             </div>
           </div>
+
+          {/* Game info display */}
+          <div className="game-info">
+            {isTournament ? 'Tournament' : 'Cash Game'}<br/>
+            SB: ${smallBlind} | BB: ${bigBlind}
+            {ante > 0 && <><br/>Ante: ${ante}</>}
+            {isTournament && bigBlindAnte > 0 && <><br/>BB Ante: ${bigBlindAnte}</>}
+          </div>
         </div>
 
-        {/* Game info display */}
-        <div className="game-info">
-          {isTournament ? 'Tournament' : 'Cash Game'}<br/>
-          SB: ${smallBlind} | BB: ${bigBlind}
-          {ante > 0 && <><br/>Ante: ${ante}</>}
-          {isTournament && bigBlindAnte > 0 && <><br/>BB Ante: ${bigBlindAnte}</>}
+        {/* Action section - responsive placement */}
+        <div className={isMobile ? 'action-section-mobile' : 'action-section-desktop'}>
+          <ActionBar
+            hand={currentHand}
+            currentPlayer={getCurrentPlayer()}
+            onAction={handleAction}
+            pot={pot}
+            bigBlind={bigBlind}
+            smallBlind={smallBlind}
+          />
         </div>
       </div>
     </div>

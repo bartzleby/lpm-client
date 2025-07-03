@@ -48,6 +48,47 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
         return display.join(' + ');
     };
 
+    // Format action badge display
+    const formatActionBadge = (lastAction) => {
+        if (!lastAction) return null;
+        
+        switch (lastAction.type) {
+            case 'fold':
+                return 'FOLD';
+            case 'check':
+                return 'CHECK';
+            case 'call':
+                return `CALL $${lastAction.amount || 0}`;
+            case 'bet':
+                return `BET $${lastAction.amount || 0}`;
+            case 'raise':
+                return `RAISE $${lastAction.amount || 0}`;
+            case 'allin':
+                return `ALL IN $${lastAction.amount || 0}`;
+            default:
+                return lastAction.type?.toUpperCase() || '';
+        }
+    };
+
+    // Get action badge color based on action type
+    const getActionBadgeColor = (actionType) => {
+        switch (actionType) {
+            case 'fold':
+                return '#ef4444'; // Red
+            case 'check':
+                return '#6b7280'; // Gray
+            case 'call':
+                return '#3b82f6'; // Blue
+            case 'bet':
+            case 'raise':
+                return '#10b981'; // Green
+            case 'allin':
+                return '#f59e0b'; // Amber
+            default:
+                return '#6b7280'; // Default gray
+        }
+    };
+
     // Determine player circle class
     const getPlayerCircleClass = () => {
         let baseClass = 'player-circle';
@@ -102,11 +143,23 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
                 )}
             </div>
             
-            {/* Forced bet indicator - hide if folded */}
-            {player.forcedBet && !player.isFolded && (
-                <div className="forced-bet">
-                    {formatForcedBet(player.forcedBet)}
+            {/* Action badge - positioned toward center, replaces forced bet when present */}
+            {player.lastAction && !player.isFolded ? (
+                <div 
+                    className="action-badge"
+                    style={{
+                        backgroundColor: getActionBadgeColor(player.lastAction.type)
+                    }}
+                >
+                    {formatActionBadge(player.lastAction)}
                 </div>
+            ) : (
+                /* Forced bet indicator - only show if no action and not folded */
+                player.forcedBet && !player.isFolded && (
+                    <div className="forced-bet">
+                        {formatForcedBet(player.forcedBet)}
+                    </div>
+                )
             )}
             
             {/* Player cards */}

@@ -87,49 +87,21 @@ class Hand {
     return {
       id: this.id,
       timestamp: this.timestamp,
-      handNumber: this.handNumber,
-      site: {
-        name: this.siteName,
-        currency: this.currency
-      },
-      table: {
-        name: this.tableName,
-        size: this.tableSize
-      },
-      game: {
-        type: this.gameType,
-        limit: "NL",
-        stakes: {
-          smallBlind: this.smallBlind,
-          bigBlind: this.bigBlind,
-          ante: this.ante,
-          bigBlindAnte: this.bigBlindAnte,
-          straddles: this.straddles
-        }
-      },
+      siteName: this.siteName,
+      currency: this.currency,
+      tableName: this.tableName,
+      gameType: this.gameType,
+      smallBlindAmount: this.smallBlindAmount,
+      bigBlindAmount: this.bigBlindAmount,
+      anteAmount: this.anteAmount,
+      bigBlindAnteAmount: this.bigBlindAnteAmount,
       players: this.players.map(p => ({
         name: p.name,
         seat: p.seatNumber,
-        startingChips: p.startingChips,
-        cards: p.cards.map(c => c.toString()),
-        isHero: p.name === this.heroName
+        startingStack: p.startingStack,
+        cards: p.cards.map(c => c.toString())
       })),
-      dealerSeat: this.dealerSeat,
-      actions: this.getFormattedActions(),
-      communityCards: {
-        flop: this.streets.flop.cards.map(c => c.toString()),
-        turn: this.streets.turn.cards.map(c => c.toString()),
-        river: this.streets.river.cards.map(c => c.toString())
-      },
-      pots: this.pots,
-      totalPot: this.totalPot,
-      rake: this.rake,
-      showdown: this.showdown.map(s => ({
-        player: s.playerName,
-        cards: s.cards.map(c => c.toString()),
-        handRank: s.handRank
-      })),
-      winners: this.winners
+      pots: this.pots
     };
   }
 

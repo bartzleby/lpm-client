@@ -548,32 +548,6 @@ const PokerTable = () => {
             </button>
           )}
 
-          {/* Recording controls */}
-          <div className="recording-controls">
-            {recordingStarted && currentHand ? (
-              <>
-                <span className="recording-status">Recording Hand #{handHistory.length + 1}</span>
-                <button 
-                  onClick={exportHand}
-                  className="save-hand-btn"
-                >
-                  💾 Save Hand
-                </button>
-                <button 
-                  onClick={() => {
-                    setCurrentHand(null);
-                    setRecordingStarted(false);
-                  }}
-                  className="cancel-hand-btn"
-                >
-                  ✕ Cancel
-                </button>
-              </>
-            ) : (
-              <span className="recording-hint">Move dealer button to start recording</span>
-            )}
-          </div>
-
           <div className="poker-table-container">
             {/* Poker Table */}
             <div className="poker-table">

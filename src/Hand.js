@@ -1,4 +1,5 @@
 // Hand.js - Complete hand history data structure based on https://hh-specs.handhistory.org/
+import { Action } from "./Action";
 import { Player } from "./Player";
 
 // Main Hand class
@@ -147,64 +148,4 @@ class Hand {
   }
 }
 
-// Individual action
-class Action {
-  constructor(actionNumber, playerId, action, amount, isAllin, cards) {
-    this.actionNumber = actionNumber;
-    this.playerId = playerId;
-    this.action = action; // fold, check, call, bet, raise, post sb, post bb, post ante, dealt cards, post bb ante
-    this.amount = amount;
-    this.isAllin = isAllin;
-    this.cards = cards;
-  }
-}
-
-class BetLimit {
-  constructor(betType, betCap) {
-    this.betType = betType;
-    this.betCap = betCap;
-  }
-}
-
-// Pot information
-class Pot {
-  constructor(number, amount, rake = 0) {
-    this.number = number;
-    this.amount = amount;
-    this.rake = rake;
-    this.jackpot = 0.0;
-    this.playerWins = [];
-  }
-}
-
-class PlayerWin {
-  constructor(pid, amt) {
-    this.player_id = pid;
-	  this.win_amount = amt;
-	  this.cashout_amount = 0.0;
-	  this.cashout_fee = 0.0;
-	  this.bonus_amount = 0.0;
-	  this.contributed_rake = 0.0;
-  }
-}
-
-// Street (betting round)
-class Street {
-  constructor(name) {
-    this.street = name; // preflop, flop, turn, river
-    this.actions = []; // 
-    this.cards = []; // Community cards dealt this street
-
-    this.id = 0;
-  }
-
-  addAction(action) {
-    this.actions.push(action);
-  }
-
-  addCard(card) {
-    this.cards.push(card);
-  }
-}
-
-export { Hand, Action, BetLimit, Pot, Street };
+export { Hand };

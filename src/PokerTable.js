@@ -57,7 +57,13 @@ const PokerTable = () => {
 
   // Get current active player
   const getCurrentPlayer = () => {
-    return players.find(player => player.isActive && !player.isFolded);
+    const activePlayer = players.find(player => player.isActive && !player.isFolded);
+    if (activePlayer) {
+      console.log(`Current active player: ${activePlayer.name} at position ${activePlayer.position}`);
+    } else {
+      console.log('No current active player found');
+    }
+    return activePlayer;
   };
 
   // Get remaining players count
@@ -96,19 +102,21 @@ const PokerTable = () => {
 
   // Helper function to find first active player clockwise from dealer (for post-flop)
   const getFirstActivePlayerFromDealer = () => {
-    let position = (dealerPosition + 1) % 9;
+    let position = (dealerPosition + 1) % 9; // Start with small blind position
     let attempts = 0;
     
     // Keep looking for first non-folded player clockwise from dealer
     while (attempts < 9) {
       const player = players.find(p => p.position === position);
       if (player && !player.isFolded) {
+        console.log(`Found first active player clockwise from dealer: ${player.name} at position ${position}`);
         return position;
       }
       position = (position + 1) % 9;
       attempts++;
     }
     
+    console.log('No active players found, falling back to dealer position');
     return dealerPosition; // Fallback
   };
 
@@ -369,19 +377,28 @@ const PokerTable = () => {
       );
     } else if (actionType === 'check' && isBigBlindCheckingOption(activePlayer, actionType)) {
       // Special case: BB checking their option - go to first player clockwise from dealer
-      const firstPlayerPosition = getFirstActivePlayerFromDealer();
+      console.log('BB is checking their option - moving to post-flop action');
+      console.log('Current players state:', players.map(p => `${p.name}(pos:${p.position}, folded:${p.isFolded})`));
       
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => {
+      const firstPlayerPosition = getFirstActivePlayerFromDealer();
+      console.log(`Moving action to player at position ${firstPlayerPosition}`);
+      
+      setPlayers(prevPlayers => {
+        const updatedPlayers = prevPlayers.map(player => {
           if (player.id === activePlayer.id) {
+            console.log(`Deactivating BB: ${player.name}`);
             return { ...player, lastAction: action, isActive: false };
           } else if (player.position === firstPlayerPosition) {
+            console.log(`Activating player: ${player.name} at position ${player.position}, folded: ${player.isFolded}`);
             return { ...player, isActive: true };
           } else {
             return { ...player, isActive: false };
           }
-        })
-      );
+        });
+        
+        console.log('Updated players after BB check:', updatedPlayers.map(p => `${p.name}(active:${p.isActive}, folded:${p.isFolded})`));
+        return updatedPlayers;
+      });
       
       return; // Don't call moveToNextPlayer for this special case
     } else {

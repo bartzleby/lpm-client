@@ -22,6 +22,7 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
   }
 
   if (!currentPlayer) {
+    console.log('ActionBar: No current player received');
     return (
       <div className="action-section compact">
         <div className="action-buttons">
@@ -30,6 +31,8 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
       </div>
     );
   }
+
+  console.log(`ActionBar: Current player is ${currentPlayer.name} at position ${currentPlayer.position}`);
 
   // Initialize all variables first
   const callAmount = bigBlind || 0;

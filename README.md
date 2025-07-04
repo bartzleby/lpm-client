@@ -1,10 +1,9 @@
 # Live Poker Mate
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Live hand recording application.
 
-## Available Scripts
+## Tests to create
 
-In the project directory, you can run:
+### Big Blind Walk
 
-### `npm start`
-
+### Only limps pre

@@ -4,6 +4,8 @@ import ActionBar from './ActionBar';
 import { Hand } from './Hand';
 import './PokerTable.css';
 
+import {saveHand} from './services/lmpapi';
+
 const PokerTable = () => {
   // Hand recording state
   const [currentHand, setCurrentHand] = useState(null);
@@ -443,6 +445,31 @@ const PokerTable = () => {
     });
   };
 
+  const saveCurrentHand = () => {
+    if (!currentHand) return;
+    
+    const validation = currentHand.validate();
+    if (!validation.valid) {
+      alert('Hand validation failed: ' + validation.errors.join(', '));
+      return;
+    }
+
+    const handJson = currentHand.toJSON();
+    const blob = new Blob([JSON.stringify(handJson, null, 2)], { type: 'application/json' });
+    
+    saveHand(currentHand);
+    
+    // Add to history
+    setHandHistory(prev => [...prev, currentHand]);
+    
+    // Reset for new hand
+    setCurrentHand(null);
+    setRecordingStarted(false);
+    
+    // Clear action badges for new hand
+    clearActionBadges();
+  }
+
   // Export hand history
   const exportHand = () => {
     if (!currentHand) return;
@@ -724,7 +751,7 @@ const PokerTable = () => {
             dealerPosition={dealerPosition}
             isHandOver={isHandOver()}
             winningPlayer={getWinningPlayer()}
-            onSaveHand={exportHand}
+            onSaveHand={saveCurrentHand}
           />
         </div>
       </div>

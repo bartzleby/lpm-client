@@ -48,31 +48,45 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
         return display.join(' + ');
     };
 
-    // Format action badge display
+    // Format action badge display - FIXED VERSION
     const formatActionBadge = (lastAction) => {
         if (!lastAction) return null;
         
-        switch (lastAction.type) {
+        // Handle both old format (action.action) and new format (action.type)
+        const actionType = lastAction.type || lastAction.action;
+        const actionAmount = lastAction.amount || 0;
+        
+        switch (actionType?.toLowerCase()) {
             case 'fold':
                 return 'FOLD';
             case 'check':
                 return 'CHECK';
             case 'call':
-                return `CALL $${lastAction.amount || 0}`;
+                return actionAmount > 0 ? `CALL $${actionAmount}` : 'CALL';
             case 'bet':
-                return `BET $${lastAction.amount || 0}`;
+                return `BET $${actionAmount}`;
             case 'raise':
-                return `RAISE $${lastAction.amount || 0}`;
+                return `RAISE $${actionAmount}`;
             case 'allin':
-                return `ALL IN $${lastAction.amount || 0}`;
+            case 'all in':
+                return `ALL IN $${actionAmount}`;
+            case 'post sb':
+                return `SB $${actionAmount}`;
+            case 'post bb':
+                return `BB $${actionAmount}`;
+            case 'post ante':
+                return `ANTE $${actionAmount}`;
             default:
-                return lastAction.type?.toUpperCase() || '';
+                // Fallback for any unhandled action types
+                return actionType?.toUpperCase() || '';
         }
     };
 
-    // Get action badge color based on action type
+    // Get action badge color based on action type - UPDATED
     const getActionBadgeColor = (actionType) => {
-        switch (actionType) {
+        const type = (actionType?.type || actionType?.action || actionType)?.toLowerCase();
+        
+        switch (type) {
             case 'fold':
                 return '#ef4444'; // Red
             case 'check':
@@ -83,7 +97,12 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
             case 'raise':
                 return '#10b981'; // Green
             case 'allin':
+            case 'all in':
                 return '#f59e0b'; // Amber
+            case 'post sb':
+            case 'post bb':
+            case 'post ante':
+                return '#8b5cf6'; // Purple for forced bets
             default:
                 return '#6b7280'; // Default gray
         }
@@ -148,7 +167,7 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
                 <div 
                     className="action-badge"
                     style={{
-                        backgroundColor: getActionBadgeColor(player.lastAction.type)
+                        backgroundColor: getActionBadgeColor(player.lastAction)
                     }}
                 >
                     {formatActionBadge(player.lastAction)}

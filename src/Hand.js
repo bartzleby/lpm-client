@@ -42,12 +42,12 @@ class Hand {
     return player;
   }
 
-  setHero(playerName) {
-    this.heroName = playerName;
+  setHero(hero_player_id) {
+    this.heroPlayerId = hero_player_id;
   }
 
-  setDealerSeat(seatNumber) {
-    this.dealerSeat = seatNumber;
+  setDealerSeat(dealer_seat) {
+    this.dealerSeat = dealer_seat;
   }
 
   // Actions

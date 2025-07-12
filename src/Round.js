@@ -1,5 +1,19 @@
 // Street (betting round)
-class Street {
+// {
+// 	"id": integer,
+// 	"street": street_string
+// 	"cards": [
+// 		string,
+// 		string,
+// 		string
+// 	],
+// 	"actions": [
+// 		<action_obj>,
+// 		<action_obj>
+// 	]
+// }
+
+class Round {
   constructor(name) {
     this.street = name; // preflop, flop, turn, river
     this.actions = []; // 
@@ -17,4 +31,4 @@ class Street {
   }
 }
 
-export { Street };
+export { Round };

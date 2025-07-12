@@ -1,6 +1,22 @@
+// 
+// Action.js -- 
+// 
+// 
+// {
+// 	"action_number": integer,
+// 	"player_id": integer,
+// 	"action": string,
+// 	"amount": decimal,
+// 	"is_allin": boolean,
+// 	"cards": [
+// 		card string,
+// 		card string
+// 	]
+// }
+
 class Action {
-  constructor(actionNumber, playerId, action, amount, isAllin, cards) {
-    this.actionNumber = actionNumber;
+  constructor(number, playerId, action, amount, isAllin, cards) {
+    this.number = number;
     this.playerId = playerId;
     this.action = action; // fold, check, call, bet, raise, post sb, post bb, post ante, dealt cards, post bb ante
     this.amount = amount;

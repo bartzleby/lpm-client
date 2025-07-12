@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import './ActionBar.css';
 
-function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, dealerPosition, isHandOver, winningPlayer, onSaveHand }) {
+// TODO: alot of these props are encapsulated in currentHand
+function ActionBar({ dealerSeat, bigBlindAmount, currentPlayer, currentBet, onAction, isHandOver, winningPlayer, onSaveHand }) {
   const [showRaiseSlider, setShowRaiseSlider] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(0);
 
   // If hand is over, show winning message and save option
+  // TODO: fix pot amount
   if (isHandOver && winningPlayer) {
     return (
       <div className="action-section compact">
@@ -14,7 +16,7 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
             className="action-button save-hand"
             onClick={onSaveHand}
           >
-            💾 {winningPlayer.name} wins ${pot}! Save Hand
+            💾 {winningPlayer.name} wins ${42}! Save Hand
           </button>
         </div>
       </div>
@@ -34,13 +36,9 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
 
   console.log(`ActionBar: Current player is ${currentPlayer.name} at position ${currentPlayer.position}`);
 
-  // Initialize all variables first
-  const callAmount = bigBlind || 0;
-  const initialPot = smallBlind + bigBlind;
-
-  const handleAction = (actionType, amount = null) => {
+  const handleAction = (action) => {
     if (onAction) {
-      onAction(actionType, amount);
+      onAction(action);
     }
     // Reset all inputs
     setShowRaiseSlider(false);
@@ -49,15 +47,21 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
 
   const handleRaiseClick = () => {
     // Calculate default raise (3x the bet being faced)
-    const betToCall = bigBlind || 0;
-    const defaultRaise = betToCall * 3;
+    const defaultRaise = currentBet * 3;
     setRaiseAmount(defaultRaise);
     setShowRaiseSlider(true);
   };
 
   const handleRaiseSubmit = () => {
     if (raiseAmount > 0) {
-      handleAction('raise', raiseAmount);
+      handleAction({
+        number: 1,
+        playerId: 0,
+        action: 'raise',
+        amount: raiseAmount,
+        isAllIn: false,
+        cards: []
+      });
     }
   };
 
@@ -68,22 +72,23 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
 
   // Big Blind Option Logic
   const isBigBlindOption = () => {
-    if (!currentPlayer || dealerPosition === undefined) return false;
+    if (!currentPlayer || dealerSeat-1 === undefined) return false;
     
-    const bigBlindPosition = (dealerPosition + 2) % 9;
+    const bigBlindPosition = (dealerSeat-1 + 2) % 9;
     const playerIsBigBlind = currentPlayer.position === bigBlindPosition;
     
     // BB gets option when they are BB and pot shows no raises
-    return playerIsBigBlind && pot <= initialPot + (bigBlind * 7);
+    return playerIsBigBlind && currentPlayer.proffered == currentBet;
   };
   
   // Regular players face action when there's a bet to call
   // But BB doesn't "face action" during their option - they can check
-  const needsToCall = pot > 0 && !isBigBlindOption();
+  const needsToCall = currentPlayer.proffered < currentBet ? true : false;
+  console.log(`${currentPlayer.name} needs to call ${needsToCall}`);
   
   // Calculate slider bounds for raises
-  const minRaise = callAmount * 2;
-  const maxRaise = currentPlayer ? currentPlayer.chips : callAmount * 10;
+  const minRaise = currentBet * 2;
+  const maxRaise = currentPlayer ? currentPlayer.chips : currentBet * 10;
 
   // Show raise slider instead of main buttons
   if (showRaiseSlider) {
@@ -92,7 +97,7 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
         <div className="raise-slider-section">
           <div className="raise-info">
             <span>Raise to: ${raiseAmount}</span>
-            <span className="raise-detail">+${raiseAmount - callAmount} more</span>
+            <span className="raise-detail">+${raiseAmount - currentBet} more</span>
           </div>
           <input
             type="range"
@@ -101,7 +106,7 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
             max={maxRaise}
             value={raiseAmount}
             onChange={(e) => setRaiseAmount(parseInt(e.target.value))}
-            step={smallBlind}
+            step={bigBlindAmount}
           />
           <div className="slider-labels">
             <span>Min: ${minRaise}</span>
@@ -135,16 +140,30 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
           <>
             <button 
               className="action-button fold"
-              onClick={() => handleAction('fold')}
+              onClick={() => handleAction({
+                number: 1,
+                playerId: 1,
+                action: 'fold',
+                amount: 0,
+                isAllIn: false,
+                cards: []
+              })}
             >
               Fold
             </button>
             
             <button 
               className="action-button call"
-              onClick={() => handleAction('call', callAmount)}
+              onClick={() => handleAction({
+                number: 1,
+                playerId: 1,
+                action: 'call',
+                amount: currentBet,
+                isAllIn: false,
+                cards: []
+              })}
             >
-              Call ${callAmount}
+              Call ${currentBet - currentPlayer.proffered}
             </button>
             
             <button 
@@ -159,7 +178,14 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
           <>
             <button 
               className="action-button check"
-              onClick={() => handleAction('check')}
+              onClick={() => handleAction({
+                number: 1,
+                playerId: 1,
+                action: 'check',
+                amount: 0,
+                isAllIn: false,
+                cards: []
+              })}
               style={{ flex: 1.5 }}
             >
               Check
@@ -178,16 +204,30 @@ function ActionBar({ hand, currentPlayer, onAction, pot, bigBlind, smallBlind, d
           <>
             <button 
               className="action-button check"
-              onClick={() => handleAction('check')}
+              onClick={() => handleAction({
+                number: 1,
+                playerId: 1,
+                action: 'check',
+                amount: 0,
+                isAllIn: false,
+                cards: []
+              })}
             >
               Check
             </button>
             
             <button 
               className="action-button bet"
-              onClick={() => handleAction('bet', bigBlind)}
+              onClick={() => handleAction({
+                number: 1,
+                playerId: 1,
+                action: 'bet',
+                amount: currentBet,
+                isAllIn: false,
+                cards: []
+              })}
             >
-              Bet ${bigBlind}
+              Bet ${currentBet}
             </button>
           </>
         )}

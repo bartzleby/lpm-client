@@ -142,21 +142,29 @@ const PokerTable = () => {
     
     if (activePlayers.length <= 1) return true;
     
-    // Find the highest bet amount
+    // Find the highest bet amount among active players
     const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
     
-    // Check if all active players have either:
-    // 1. Matched the highest bet, or
-    // 2. Are all-in with less than the highest bet
-    const allPlayersActed = activePlayers.every(player => {
+    // For betting round to be complete, ALL active players must have:
+    // 1. Acted at least once (have a lastAction), AND
+    // 2. Either matched the highest bet OR be all-in with less chips
+    const allPlayersReady = activePlayers.every(player => {
       const hasActed = player.lastAction !== null;
       const hasMatchedBet = player.proffered === highestBet;
-      const isAllIn = player.chips === 0;
+      const isAllIn = player.chips === 0; // All chips are in play
       
+      // Player is ready if they've acted AND (matched the bet OR are all-in)
       return hasActed && (hasMatchedBet || isAllIn);
     });
     
-    return allPlayersActed;
+    console.log('Checking betting round completion:');
+    console.log('Active players:', activePlayers.map(p => 
+      `${p.name} (acted: ${p.lastAction !== null}, proffered: ${p.proffered}, chips: ${p.chips})`
+    ));
+    console.log('Highest bet:', highestBet);
+    console.log('All players ready:', allPlayersReady);
+    
+    return allPlayersReady;
   };
 
   // Check if this is BB checking during their option (end of preflop)
@@ -166,8 +174,29 @@ const PokerTable = () => {
     const bigBlindPosition = getBigBlindPosition(dealerPosition);
     const playerIsBigBlind = activePlayer.position === bigBlindPosition;
     
-    // BB checking their option when they face no raises
-    return playerIsBigBlind && activePlayer.proffered === currentBet;
+    if (!playerIsBigBlind) return false;
+    
+    // BB gets their option when all other players have acted and either:
+    // 1. Everyone just called the BB (no raises)
+    // 2. Everyone folded to the BB
+    const activePlayers = players.filter(p => !p.isFolded);
+    const otherActivePlayers = activePlayers.filter(p => p.id !== activePlayer.id);
+    
+    // Check if all other players have acted
+    const allOthersActed = otherActivePlayers.every(p => p.lastAction !== null);
+    
+    // Check if BB faces no raise (proffered amount equals big blind)
+    const facingNoRaise = activePlayer.proffered === bigBlind;
+    
+    console.log('BB Option Check:', {
+      isBB: playerIsBigBlind,
+      allOthersActed,
+      facingNoRaise,
+      bbProffered: activePlayer.proffered,
+      bigBlind
+    });
+    
+    return playerIsBigBlind && allOthersActed && facingNoRaise;
   };
 
   // Calculate initial pot from forced bets
@@ -225,15 +254,23 @@ const PokerTable = () => {
       return;
     }
     
+    console.log(`Starting ${nextStreet}`);
     setCurrentStreet(nextStreet);
     
     // Reset betting for new street
     setCurrentBet(0);
+    
+    // Find first active player for new street (first active player clockwise from dealer)
+    const firstActivePosition = getFirstActivePlayerFromDealer();
+    console.log(`Setting first active player for ${nextStreet} to position ${firstActivePosition}`);
+    
+    // Reset players for new street
     setPlayers(prevPlayers => 
       prevPlayers.map(player => ({
         ...player,
         proffered: 0,
-        lastAction: null
+        lastAction: null,
+        isActive: player.position === firstActivePosition && !player.isFolded
       }))
     );
     
@@ -245,16 +282,8 @@ const PokerTable = () => {
       cards: []
     });
     
-    // Set first active player for new street (first active player clockwise from dealer)
-    const firstActivePosition = getFirstActivePlayerFromDealer();
-    setPlayers(prevPlayers => 
-      prevPlayers.map(player => ({
-        ...player,
-        isActive: player.position === firstActivePosition && !player.isFolded
-      }))
-    );
-    
-    console.log(`Started ${nextStreet}, action on position ${firstActivePosition}`);
+    // Reset action number for new street
+    setActionNumber(1);
   };
 
   // Start recording a new hand
@@ -482,21 +511,74 @@ const PokerTable = () => {
       // Special case: BB checking their option ends preflop
       if (isBigBlindCheckingOption(activePlayer, action.type)) {
         console.log('BB checked their option - moving to flop');
-        startNewStreet();
+        setTimeout(() => startNewStreet(), 100);
         return;
       }
     }
 
     // Check if betting round is complete after this action
+    // Use a longer timeout to ensure state updates have completed
     setTimeout(() => {
-      if (isBettingRoundComplete()) {
-        console.log('Betting round complete - moving to next street');
-        startNewStreet();
-      } else {
-        // Move to next player
-        moveToNextPlayer();
+      const currentActivePlayers = players.filter(p => !p.isFolded);
+      if (currentActivePlayers.length <= 1) {
+        console.log('Hand over - only one player remaining');
+        return;
       }
-    }, 100);
+      
+      // Get fresh state for the check
+      setPlayers(currentPlayers => {
+        const activePlayers = currentPlayers.filter(p => !p.isFolded);
+        const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
+        
+        const allPlayersReady = activePlayers.every(player => {
+          const hasActed = player.lastAction !== null;
+          const hasMatchedBet = player.proffered === highestBet;
+          const isAllIn = player.chips === 0;
+          
+          return hasActed && (hasMatchedBet || isAllIn);
+        });
+        
+        console.log('Post-action betting round check:');
+        console.log('Active players:', activePlayers.map(p => 
+          `${p.name} (acted: ${p.lastAction !== null}, proffered: ${p.proffered}, chips: ${p.chips})`
+        ));
+        console.log('Highest bet:', highestBet);
+        console.log('All players ready:', allPlayersReady);
+        
+        if (allPlayersReady) {
+          console.log('Betting round complete - moving to next street');
+          setTimeout(() => startNewStreet(), 50);
+        } else {
+          console.log('Betting round not complete - moving to next player');
+          // Move to next player using current state
+          const currentActiveIndex = currentPlayers.findIndex(player => player.isActive);
+          if (currentActiveIndex !== -1) {
+            let nextPosition = (currentPlayers[currentActiveIndex].position + 1) % 9;
+            let attempts = 0;
+            
+            while (attempts < 9) {
+              const nextPlayer = currentPlayers.find(p => p.position === nextPosition);
+              if (nextPlayer && !nextPlayer.isFolded) {
+                break;
+              }
+              nextPosition = (nextPosition + 1) % 9;
+              attempts++;
+            }
+            
+            setTimeout(() => {
+              setPlayers(prevPlayers => 
+                prevPlayers.map(player => ({
+                  ...player,
+                  isActive: player.position === nextPosition && !player.isFolded
+                }))
+              );
+            }, 50);
+          }
+        }
+        
+        return currentPlayers; // Return unchanged state
+      });
+    }, 150); // Longer timeout to ensure all state updates complete
   };
 
   // Map action types to OHH format

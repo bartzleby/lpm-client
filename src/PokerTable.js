@@ -136,37 +136,6 @@ const PokerTable = () => {
     return dealerPos; // Fallback
   };
 
-  // Check if betting round is complete
-  const isBettingRoundComplete = () => {
-    const activePlayers = players.filter(p => !p.isFolded);
-    
-    if (activePlayers.length <= 1) return true;
-    
-    // Find the highest bet amount among active players
-    const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
-    
-    // For betting round to be complete, ALL active players must have:
-    // 1. Acted at least once (have a lastAction), AND
-    // 2. Either matched the highest bet OR be all-in with less chips
-    const allPlayersReady = activePlayers.every(player => {
-      const hasActed = player.lastAction !== null;
-      const hasMatchedBet = player.proffered === highestBet;
-      const isAllIn = player.chips === 0; // All chips are in play
-      
-      // Player is ready if they've acted AND (matched the bet OR are all-in)
-      return hasActed && (hasMatchedBet || isAllIn);
-    });
-    
-    console.log('Checking betting round completion:');
-    console.log('Active players:', activePlayers.map(p => 
-      `${p.name} (acted: ${p.lastAction !== null}, proffered: ${p.proffered}, chips: ${p.chips})`
-    ));
-    console.log('Highest bet:', highestBet);
-    console.log('All players ready:', allPlayersReady);
-    
-    return allPlayersReady;
-  };
-
   // Check if this is BB checking during their option (end of preflop)
   const isBigBlindCheckingOption = (activePlayer, actionType) => {
     if (actionType !== 'check' || currentStreet !== 'preflop') return false;
@@ -229,13 +198,6 @@ const PokerTable = () => {
   };
 
   // Street progression
-  const streetMap = {
-    0: "preflop",
-    1: "flop", 
-    2: "turn",
-    3: "river"
-  };
-
   const streetNames = ["preflop", "flop", "turn", "river"];
 
   // Start new street
@@ -286,6 +248,48 @@ const PokerTable = () => {
     setActionNumber(1);
   };
 
+  // Function to deal cards to a player (call this when you want to record hole cards)
+  const dealCardsToPlayer = (playerId, cards) => {
+    const actionObj = {
+      action_number: actionNumber,
+      player_id: playerId,
+      action: "Dealt Cards",
+      amount: 0,
+      is_allin: false,
+      cards: cards
+    };
+
+    // Record the dealt cards action
+    setCurrentBettingRound(prevBettingRound => ({
+      ...prevBettingRound,
+      actions: [...prevBettingRound.actions, actionObj]
+    }));
+
+    setActionNumber(prev => prev + 1);
+
+    // Update player's hand
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => 
+        player.id === playerId 
+          ? { ...player, hand: cards }
+          : player
+      )
+    );
+
+    console.log(`Dealt cards ${cards.join(', ')} to player ${playerId}`);
+  };
+
+  // Function to deal community cards for a street
+  const dealCommunityCards = (street, cards) => {
+    console.log(`Dealing community cards for ${street}: ${cards.join(', ')}`);
+    
+    // Update current betting round with community cards
+    setCurrentBettingRound(prevBettingRound => ({
+      ...prevBettingRound,
+      cards: cards
+    }));
+  };
+
   // Start recording a new hand
   const startNewHand = () => {
     console.log('Starting new hand');
@@ -293,25 +297,25 @@ const PokerTable = () => {
     // Reset everything for new hand
     setCurrentStreet('preflop');
     setCurrentBet(bigBlind);
-    setActionNumber(1);
     setRounds([]);
     clearActionBadges();
     
     // Create initial betting round
-    setCurrentBettingRound({
+    const initialBettingRound = {
       id: 0,
       street: "preflop",
       actions: [],
       cards: []
-    });
+    };
     
     // Post forced bets and deduct from chip stacks
     const sbPos = getSmallBlindPosition(dealerPosition);
     const bbPos = getBigBlindPosition(dealerPosition);
     
     let nextActionNum = 1;
+    const forcedBetActions = [];
     
-    // Update chip stacks for forced bets
+    // Update chip stacks for forced bets and record actions
     setPlayers(prevPlayers => 
       prevPlayers.map(player => {
         let newChips = player.starting_stack;
@@ -329,21 +333,39 @@ const PokerTable = () => {
           isActive: false
         };
         
-        // Deduct small blind
+        // Post small blind
         if (player.position === sbPos && smallBlind > 0) {
           newChips -= smallBlind;
           newProffered += smallBlind;
           newForcedBet = { type: 'SB', amount: smallBlind };
+          
+          // Record SB action
+          forcedBetActions.push({
+            action_number: nextActionNum++,
+            player_id: player.id,
+            action: "Post SB",
+            amount: smallBlind,
+            is_allin: false
+          });
         }
         
-        // Deduct big blind
+        // Post big blind
         if (player.position === bbPos && bigBlind > 0) {
           newChips -= bigBlind;
           newProffered += bigBlind;
           newForcedBet = { type: 'BB', amount: bigBlind };
+          
+          // Record BB action
+          forcedBetActions.push({
+            action_number: nextActionNum++,
+            player_id: player.id,
+            action: "Post BB",
+            amount: bigBlind,
+            is_allin: false
+          });
         }
         
-        // Deduct ante
+        // Post ante
         if (ante > 0 && player.starting_stack > 0) {
           newChips -= ante;
           newProffered += ante;
@@ -352,9 +374,18 @@ const PokerTable = () => {
           } else {
             newForcedBet = { type: 'ANTE', amount: ante };
           }
+          
+          // Record ante action
+          forcedBetActions.push({
+            action_number: nextActionNum++,
+            player_id: player.id,
+            action: "Post Ante",
+            amount: ante,
+            is_allin: false
+          });
         }
         
-        // Deduct big blind ante
+        // Post big blind ante
         if (isTournament && bigBlindAnte > 0 && player.position === bbPos) {
           newChips -= bigBlindAnte;
           newProffered += bigBlindAnte;
@@ -363,6 +394,15 @@ const PokerTable = () => {
           } else {
             newForcedBet = { type: 'BB_ANTE', amount: bigBlindAnte };
           }
+          
+          // Record big blind ante action
+          forcedBetActions.push({
+            action_number: nextActionNum++,
+            player_id: player.id,
+            action: "Post BB Ante",
+            amount: bigBlindAnte,
+            is_allin: false
+          });
         }
         
         return {
@@ -373,6 +413,26 @@ const PokerTable = () => {
         };
       })
     );
+
+    // Record dealt cards actions for all players (in real app, you'd only record hero's cards)
+    // For now, we'll just record that hero was dealt cards
+    forcedBetActions.push({
+      action_number: nextActionNum++,
+      player_id: 1, // Hero's ID
+      action: "Dealt Cards",
+      amount: 0,
+      is_allin: false,
+      cards: [] // In real implementation, you'd add actual cards here
+    });
+
+    // Set the initial betting round with forced bet actions
+    setCurrentBettingRound({
+      ...initialBettingRound,
+      actions: forcedBetActions
+    });
+
+    // Set action number for next action
+    setActionNumber(nextActionNum);
 
     // Set initial active player (UTG for preflop)
     const firstActivePosition = getActivePlayerPosition(dealerPosition);
@@ -540,7 +600,7 @@ const PokerTable = () => {
         
         console.log('Post-action betting round check:');
         console.log('Active players:', activePlayers.map(p => 
-          `${p.name} (acted: ${p.lastAction !== null}, proffered: ${p.proffered}, chips: ${p.chips})`
+          `${p.name} (acted: ${p.lastAction !== null}, proffered: $${p.proffered}, chips: $${p.chips})`
         ));
         console.log('Highest bet:', highestBet);
         console.log('All players ready:', allPlayersReady);
@@ -594,34 +654,13 @@ const PokerTable = () => {
     return mapping[actionType] || actionType;
   };
 
-  // Move to next active player
-  const moveToNextPlayer = () => {
-    setPlayers(prevPlayers => {
-      const currentActiveIndex = prevPlayers.findIndex(player => player.isActive);
-      if (currentActiveIndex === -1) return prevPlayers;
-
-      // Find next non-folded player
-      let nextPosition = (prevPlayers[currentActiveIndex].position + 1) % 9;
-      let attempts = 0;
-      
-      // Keep looking for next active player (not folded)
-      while (attempts < 9) {
-        const nextPlayer = prevPlayers.find(p => p.position === nextPosition);
-        if (nextPlayer && !nextPlayer.isFolded) {
-          break;
-        }
-        nextPosition = (nextPosition + 1) % 9;
-        attempts++;
-      }
-      
-      return prevPlayers.map(player => ({
-        ...player,
-        isActive: player.position === nextPosition && !player.isFolded
-      }));
-    });
-  };
-
   const saveCurrentHand = () => {
+    // Ensure we include the current betting round in rounds
+    const allRounds = [...rounds];
+    if (currentBettingRound.actions.length > 0) {
+      allRounds.push(currentBettingRound);
+    }
+
     // Create OHH format hand
     const hand = {
       spec_version: "1.4.6",
@@ -649,7 +688,7 @@ const PokerTable = () => {
         starting_stack: player.starting_stack,
         seat: player.position + 1 // OHH uses 1-indexed seats
       })),
-      rounds: [...rounds, currentBettingRound],
+      rounds: allRounds,
       pots: [{
         number: 0,
         amount: pot,
@@ -662,7 +701,8 @@ const PokerTable = () => {
       }]
     };
     
-    console.log('Saving hand:', hand);
+    console.log('Saving hand with rounds:', allRounds);
+    console.log('Full hand object:', hand);
     
     saveHand(hand).then(() => {
       console.log('Hand saved successfully');
@@ -757,6 +797,10 @@ const PokerTable = () => {
   const applyGameConfig = () => {
     setShowConfig(false);
   };
+
+  // Expose functions for dealing cards (you can call these from UI components)
+  window.dealCardsToPlayer = dealCardsToPlayer;
+  window.dealCommunityCards = dealCommunityCards;
 
   return (
     <div className={`poker-wrapper ${isMobile ? 'mobile' : 'desktop'}`}>

@@ -1,6 +1,6 @@
 // Hand.js - Complete hand history data structure based on https://hh-specs.handhistory.org/
 import { Action } from "./Action";
-import { Player } from "./Player";
+import { Player } from "../Player";
 
 // Main Hand class
 class Hand {

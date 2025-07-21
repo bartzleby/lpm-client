@@ -7,8 +7,8 @@ import DealerButton from './DealerButton';
 import GameConfigPanel from './GameConfigPanel';
 import PokerTableSurface from './PokerTableSurface';
 import GameInfoDisplay from './GameInfoDisplay';
-import { useHandManager } from '../hooks/useHandManager';
-import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { useHandManager } from '../../hooks/useHandManager';
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 import './PokerTable.css';
 
 const PokerTable = () => {

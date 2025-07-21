@@ -1,6 +1,7 @@
-// useHandManager.js - Custom hook for managing hand state and actions
+// src/hooks/useHandManager.js - Updated with authentication check
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   getActivePlayerPosition, 
   getSmallBlindPosition, 
@@ -17,8 +18,10 @@ import {
   getWinningPlayer
 } from '../utils/gameLogic';
 import { saveHand } from '../services/apilivepokermate';
+import { isAuthenticated } from '../utils/auth';
 
 export const useHandManager = (gameConfig, players, setPlayers) => {
+  const navigate = useNavigate();
   const [currentBet, setCurrentBet] = useState(0);
   const [rounds, setRounds] = useState([]);
   const [currentStreet, setCurrentStreet] = useState('preflop');
@@ -452,8 +455,20 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     }, 150);
   };
 
-  // Save current hand
+  // Save current hand - with authentication check
   const saveCurrentHand = () => {
+    // Check if user is authenticated before saving
+    if (!isAuthenticated()) {
+      console.log('🔒 User not authenticated, redirecting to login...');
+      navigate('/login', {
+        state: {
+          from: { pathname: '/' },
+          message: 'Please log in to save your poker hands.'
+        }
+      });
+      return;
+    }
+
     const allRounds = [...rounds];
     if (currentBettingRound.actions.length > 0) {
       allRounds.push(currentBettingRound);
@@ -505,6 +520,16 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       startNewHand();
     }).catch(error => {
       console.error('Error saving hand:', error);
+      
+      // Handle authentication errors specifically
+      if (error.message?.includes('log in')) {
+        navigate('/login', {
+          state: {
+            from: { pathname: '/' },
+            message: error.message
+          }
+        });
+      }
     });
   };
 

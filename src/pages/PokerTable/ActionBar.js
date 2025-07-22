@@ -23,7 +23,6 @@ function ActionBar({
 
   // If hand is over, show winning message and save option
   if (isHandOver && winningPlayer) {
-    const totalPot = getCurrentTotalPot();
     return (
       <div className="action-section compact">
         <div className="action-buttons">
@@ -31,7 +30,7 @@ function ActionBar({
             className="action-button save-hand"
             onClick={onSaveHand}
           >
-            💾 {winningPlayer.name} wins ${totalPot}! Save Hand
+            💾 {winningPlayer.name} wins ${pot}! Save Hand
           </button>
         </div>
       </div>
@@ -174,14 +173,6 @@ function ActionBar({
     setShowRaiseSlider(false);
     setRaiseAmount(0);
   };
-
-  // Calculate current total pot including this street's betting
-  function getCurrentTotalPot() {
-    const currentStreetBetting = playersInHand.reduce((total, player) => total + (player.proffered || 0), 0);
-    const totalPot = pot + currentStreetBetting;
-    console.log(`Current total pot: main pot ${pot} + current street ${currentStreetBetting} = ${totalPot}`);
-    return totalPot;
-  }
 
   // Determine if player is facing a bet they need to call
   const needsToCall = currentPlayer.proffered < currentBet;

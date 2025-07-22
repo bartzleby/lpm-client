@@ -49,7 +49,7 @@ export const getFirstActivePlayerFromDealer = (dealerPos, players) => {
   return dealerPos; // Fallback
 };
 
-export const isBigBlindCheckingOption = (activePlayer, actionType, currentStreet, dealerPosition, bigBlind) => {
+export const isBigBlindOption = (activePlayer, actionType, currentStreet, dealerPosition, bigBlind) => {
   if (!activePlayer || actionType !== 'check' || currentStreet !== 'preflop') return false;
   
   const bigBlindPosition = getBigBlindPosition(dealerPosition);
@@ -79,18 +79,6 @@ export const calculateInitialPot = (smallBlind, bigBlind, ante, bigBlindAnte, pl
   }
   
   return totalPot;
-};
-
-export const mapActionTypeToOHH = (actionType) => {
-  const mapping = {
-    'fold': 'Fold',
-    'check': 'Check',
-    'call': 'Call',
-    'bet': 'Bet',
-    'raise': 'Raise',
-    'allin': 'Raise' // All-in is handled by is_allin flag
-  };
-  return mapping[actionType] || actionType;
 };
 
 export const streetNames = ["preflop", "flop", "turn", "river"];

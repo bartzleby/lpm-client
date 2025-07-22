@@ -8,7 +8,7 @@ import {
   getBigBlindPosition,
   getNextActivePlayerPosition,
   getFirstActivePlayerFromDealer,
-  isBigBlindCheckingOption,
+  isBigBlindOption,
   calculateInitialPot,
   mapActionTypeToOHH,
   streetNames,
@@ -336,7 +336,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     const actionObj = {
       action_number: actionNumber,
       player_id: activePlayer.id,
-      action: mapActionTypeToOHH(action.type),
+      action: action.type,
       amount: action.type === 'call' ? totalProffered : (action.type === 'bet' || action.type === 'raise' ? totalProffered : (action.amount || 0)), // Record the total amount bet/raised to
       is_allin: action.allIn || false
     };
@@ -425,7 +425,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       );
 
       // Special case: BB checking their option ends preflop
-      if (isBigBlindCheckingOption(activePlayer, action.type, currentStreet, gameConfig.dealerPosition, gameConfig.bigBlind)) {
+      if (isBigBlindOption(activePlayer, action.type, currentStreet, gameConfig.dealerPosition, gameConfig.bigBlind)) {
         console.log('BB checked their option - moving to flop');
         setTimeout(() => startNewStreet(), 100);
         return;

@@ -29,7 +29,7 @@ const GameConfigPanel = ({
         onClick={() => setShowConfig(true)}
         className="settings-btn"
       >
-        ⚙️ Settings
+        ⚙️ game config
       </button>
     );
   }

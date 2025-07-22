@@ -1,27 +1,38 @@
-// src/hooks/useHandManager.js - Fixed street progression logic
+// src/hooks/useHandManager.js - Simplified and refactored
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   getActivePlayerPosition, 
-  getSmallBlindPosition, 
-  getBigBlindPosition,
-  getNextActivePlayerPosition,
-  getFirstActivePlayerFromDealer,
-  isBigBlindOption,
-  calculateInitialPot,
-  mapActionTypeToOHH,
   streetNames,
   getCurrentPlayer,
   getRemainingPlayersCount,
   isHandOver,
   getWinningPlayer
 } from '../utils/gameLogic';
+import { 
+  isBettingRoundComplete, 
+  calculateBetAmounts 
+} from '../utils/bettingLogic';
+import { 
+  initializeForcedBets, 
+  createInitialBettingRound, 
+  resetPlayersForNewStreet 
+} from '../utils/handStateManager';
+import { 
+  createActionObject,
+  handleFoldAction,
+  processMoneyAction,
+  processCheckAction,
+  handleBettingRoundCompletion
+} from '../utils/actionHandlers';
 import { saveHand } from '../services/apilivepokermate';
 import { isAuthenticated } from '../utils/auth';
 
 export const useHandManager = (gameConfig, players, setPlayers) => {
   const navigate = useNavigate();
+  
+  // Core state
   const [currentBet, setCurrentBet] = useState(0);
   const [lastRaiseSize, setLastRaiseSize] = useState(0);
   const [rounds, setRounds] = useState([]);
@@ -35,7 +46,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
   });
   const [pot, setPot] = useState(0);
 
-  // Clear all action badges (for new hand/street)
+  // Clear all action badges
   const clearActionBadges = () => {
     setPlayers(prevPlayers => 
       prevPlayers.map(player => ({
@@ -45,41 +56,9 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     );
   };
 
-  // Check if betting round is complete
-  const isBettingRoundComplete = (currentPlayers) => {
-    const activePlayers = currentPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
-    
-    console.log(`🔍 Checking betting completion with ${activePlayers.length} active players`);
-    
-    if (activePlayers.length <= 1) {
-      console.log(`🔍 Hand over - only ${activePlayers.length} players left`);
-      return true; // Hand is over
-    }
-    
-    const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
-    console.log(`🔍 Highest bet is: ${highestBet}`);
-    
-    const playersStatus = activePlayers.map(player => {
-      const hasActed = player.lastAction !== null;
-      const hasMatchedBet = player.proffered === highestBet;
-      const isAllIn = player.chips === 0;
-      const isReady = hasActed && (hasMatchedBet || isAllIn);
-      
-      console.log(`🔍 ${player.name}: acted=${hasActed}, matched=${hasMatchedBet} (${player.proffered}/${highestBet}), allIn=${isAllIn}, ready=${isReady}`);
-      
-      return isReady;
-    });
-    
-    const allReady = playersStatus.every(status => status === true);
-    console.log(`🔍 All players ready: ${allReady}`);
-    
-    return allReady;
-  };
-
   // Start new street
   const startNewStreet = () => {
     console.log(`🎯 Ending ${currentStreet}, starting next street`);
-    console.log(`🎯 Current pot when ending street: ${pot}`);
     
     // Save current round
     setRounds(prevRounds => [...prevRounds, currentBettingRound]);
@@ -100,41 +79,10 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     setCurrentBet(0);
     setLastRaiseSize(0);
     
-    // Reset players for new street - proffered amounts reset but pot remains
-    setPlayers(prevPlayers => {
-      // Find first active player for new street (must check current player states)
-      const activePlayers = prevPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
-      console.log(`🎯 Active players for ${nextStreet}:`, activePlayers.map(p => `${p.name}(${p.position})`));
-      
-      let firstActivePosition = null;
-      
-      // Start from small blind position and find first non-folded player
-      let position = (gameConfig.dealerPosition + 1) % 9; // Small blind position
-      let attempts = 0;
-      
-      while (attempts < 9) {
-        const player = activePlayers.find(p => p.position === position);
-        if (player) {
-          firstActivePosition = position;
-          console.log(`🎯 Found first active player for ${nextStreet}: ${player.name} at position ${position}`);
-          break;
-        }
-        position = (position + 1) % 9;
-        attempts++;
-      }
-      
-      if (firstActivePosition === null) {
-        console.log('🎯 ERROR: No active players found for new street!');
-        firstActivePosition = gameConfig.dealerPosition; // Fallback
-      }
-      
-      return prevPlayers.map(player => ({
-        ...player,
-        proffered: 0,
-        lastAction: null,
-        isActive: player.position === firstActivePosition && !player.isFolded && !player.isAnimatingFold
-      }));
-    });
+    // Reset players for new street
+    setPlayers(prevPlayers => 
+      resetPlayersForNewStreet(prevPlayers, gameConfig.dealerPosition, nextStreet)
+    );
     
     // Create new betting round
     setCurrentBettingRound({
@@ -144,7 +92,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       cards: []
     });
     
-    // Reset action number for new street
     setActionNumber(1);
   };
 
@@ -177,7 +124,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     console.log(`🎯 Dealt cards ${cards.join(', ')} to player ${playerId}`);
   };
 
-  // Deal community cards for a street
+  // Deal community cards
   const dealCommunityCards = (street, cards) => {
     console.log(`🎯 Dealing community cards for ${street}: ${cards.join(', ')}`);
     
@@ -197,124 +144,18 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     setRounds([]);
     clearActionBadges();
     
-    const initialBettingRound = {
-      id: 0,
-      street: "preflop",
-      actions: [],
-      cards: []
-    };
+    // Initialize forced bets and player states
+    const { updatedPlayers, forcedBetActions, nextActionNum } = initializeForcedBets(players, gameConfig);
     
-    const sbPos = getSmallBlindPosition(gameConfig.dealerPosition);
-    const bbPos = getBigBlindPosition(gameConfig.dealerPosition);
+    // Set players with forced bets
+    setPlayers(updatedPlayers);
     
-    let nextActionNum = 1;
-    const forcedBetActions = [];
-    
-    setPlayers(prevPlayers => 
-      prevPlayers.map(player => {
-        let newChips = player.starting_stack;
-        let newProffered = 0;
-        let newForcedBet = null;
-        
-        const resetPlayer = {
-          ...player,
-          chips: player.starting_stack,
-          proffered: 0,
-          isFolded: false,
-          isAnimatingFold: false,
-          lastAction: null,
-          isActive: false
-        };
-        
-        if (player.position === sbPos && gameConfig.smallBlind > 0) {
-          newChips -= gameConfig.smallBlind;
-          newProffered += gameConfig.smallBlind;
-          newForcedBet = { type: 'SB', amount: gameConfig.smallBlind };
-          
-          forcedBetActions.push({
-            action_number: nextActionNum++,
-            player_id: player.id,
-            action: "Post SB",
-            amount: gameConfig.smallBlind,
-            is_allin: false
-          });
-        }
-        
-        if (player.position === bbPos && gameConfig.bigBlind > 0) {
-          newChips -= gameConfig.bigBlind;
-          newProffered += gameConfig.bigBlind;
-          newForcedBet = { type: 'BB', amount: gameConfig.bigBlind };
-          
-          forcedBetActions.push({
-            action_number: nextActionNum++,
-            player_id: player.id,
-            action: "Post BB",
-            amount: gameConfig.bigBlind,
-            is_allin: false
-          });
-        }
-        
-        if (gameConfig.ante > 0 && player.starting_stack > 0) {
-          newChips -= gameConfig.ante;
-          newProffered += gameConfig.ante;
-          if (newForcedBet) {
-            newForcedBet.ante = gameConfig.ante;
-          } else {
-            newForcedBet = { type: 'ANTE', amount: gameConfig.ante };
-          }
-          
-          forcedBetActions.push({
-            action_number: nextActionNum++,
-            player_id: player.id,
-            action: "Post Ante",
-            amount: gameConfig.ante,
-            is_allin: false
-          });
-        }
-        
-        if (gameConfig.isTournament && gameConfig.bigBlindAnte > 0 && player.position === bbPos) {
-          newChips -= gameConfig.bigBlindAnte;
-          newProffered += gameConfig.bigBlindAnte;
-          if (newForcedBet) {
-            newForcedBet.bbAnte = gameConfig.bigBlindAnte;
-          } else {
-            newForcedBet = { type: 'BB_ANTE', amount: gameConfig.bigBlindAnte };
-          }
-          
-          forcedBetActions.push({
-            action_number: nextActionNum++,
-            player_id: player.id,
-            action: "Post BB Ante",
-            amount: gameConfig.bigBlindAnte,
-            is_allin: false
-          });
-        }
-        
-        return {
-          ...resetPlayer,
-          chips: Math.max(0, newChips),
-          proffered: newProffered,
-          forcedBet: newForcedBet
-        };
-      })
-    );
+    // Create initial betting round
+    const initialBettingRound = createInitialBettingRound(forcedBetActions, nextActionNum);
+    setCurrentBettingRound(initialBettingRound);
+    setActionNumber(nextActionNum + 1);
 
-    forcedBetActions.push({
-      action_number: nextActionNum++,
-      player_id: 1,
-      action: "Dealt Cards",
-      amount: 0,
-      is_allin: false,
-      cards: []
-    });
-
-    setCurrentBettingRound({
-      ...initialBettingRound,
-      actions: forcedBetActions
-    });
-
-    setActionNumber(nextActionNum);
-
+    // Set initial active player (UTG for preflop)
     const firstActivePosition = getActivePlayerPosition(gameConfig.dealerPosition, 'preflop');
     setPlayers(prevPlayers => 
       prevPlayers.map(player => ({
@@ -323,222 +164,102 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       }))
     );
 
-    setPot(calculateInitialPot(
-      gameConfig.smallBlind, 
-      gameConfig.bigBlind, 
-      gameConfig.ante, 
-      gameConfig.bigBlindAnte, 
-      players, 
-      gameConfig.isTournament
-    ));
+    // Calculate initial pot
+    const initialPot = gameConfig.smallBlind + gameConfig.bigBlind + 
+                      (gameConfig.ante * players.filter(p => p.starting_stack > 0).length) +
+                      (gameConfig.isTournament ? gameConfig.bigBlindAnte : 0);
+    setPot(initialPot);
   };
 
-  // Handle action buttons
+  // Handle player actions
   const handleAction = (action) => {
     const activePlayer = players.find(p => p.isActive && !p.isFolded);
     if (!activePlayer) return;
 
     console.log(`🎯 Handling action: ${action.type} for ${activePlayer.name}`, action);
-    console.log(`🎯 Current street: ${currentStreet}, Current bet: ${currentBet}`);
 
-    let actualAmount = action.amount || 0;
-    let totalProffered = activePlayer.proffered;
+    // Calculate bet amounts
+    const { actualAmount, totalProffered } = calculateBetAmounts(action, activePlayer, currentBet);
 
+    // Update current bet and raise size for betting actions
     if (action.type === 'bet') {
-      actualAmount = action.amount;
-      totalProffered = action.amount;
       setCurrentBet(action.amount);
       setLastRaiseSize(action.amount);
-      console.log(`🎯 BET: Setting current bet to ${action.amount}, raise size to ${action.amount}`);
     } else if (action.type === 'raise') {
-      const previousBet = currentBet;
-      totalProffered = action.amount;
-      actualAmount = action.amount - activePlayer.proffered;
-      const raiseSize = action.amount - previousBet;
+      const raiseSize = action.amount - currentBet;
       setCurrentBet(action.amount);
       setLastRaiseSize(raiseSize);
-      console.log(`🎯 RAISE: Setting current bet to ${action.amount}, previous bet was ${previousBet}, raise size: ${raiseSize}, actual amount deducted: ${actualAmount}`);
-    } else if (action.type === 'call') {
-      actualAmount = currentBet - activePlayer.proffered;
-      totalProffered = currentBet;
-      console.log(`🎯 CALL: Current bet is ${currentBet}, actual amount deducted: ${actualAmount}`);
     }
 
-    const actionObj = {
-      action_number: actionNumber,
-      player_id: activePlayer.id,
-      action: action.type,
-      amount: action.type === 'call' ? totalProffered : (action.type === 'bet' || action.type === 'raise' ? totalProffered : (action.amount || 0)),
-      is_allin: action.allIn || false
-    };
-
-    console.log('🎯 Recording action:', actionObj);
-
-    setCurrentBettingRound(prevBettingRound => {
-      const updatedRound = {
-        ...prevBettingRound,
-        actions: [...prevBettingRound.actions, actionObj]
-      };
-      console.log('🎯 Updated betting round after adding action:', updatedRound);
-      return updatedRound;
-    });
+    // Create and record action
+    const actionObj = createActionObject(action, activePlayer, actionNumber, totalProffered);
+    
+    setCurrentBettingRound(prevBettingRound => ({
+      ...prevBettingRound,
+      actions: [...prevBettingRound.actions, actionObj]
+    }));
 
     setActionNumber(prev => prev + 1);
 
-    // Handle fold action - SPECIAL CASE: Check for betting completion immediately after fold
+    // Handle fold action
     if (action.type === 'fold') {
-      setPlayers(prevPlayers => {
-        const updatedPlayers = prevPlayers.map(player => {
-          if (player.id === activePlayer.id) {
-            return { 
-              ...player, 
-              isAnimatingFold: true, 
-              isActive: false,
-              lastAction: action
-            };
-          }
-          return { ...player, isActive: false };
-        });
-
-        // Check if betting is complete after this fold (before setting next active player)
-        const activePlayers = updatedPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
-        console.log(`🎯 After fold, ${activePlayers.length} players remain`);
-        
-        if (activePlayers.length <= 1) {
-          console.log('🎯 Hand over after fold - only one player remaining');
-          return updatedPlayers;
-        }
-        
-        // Check if betting round is complete after this fold
-        const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
-        const bettingComplete = activePlayers.every(player => {
-          const hasActed = player.lastAction !== null;
-          const hasMatchedBet = player.proffered === highestBet;
-          const isAllIn = player.chips === 0;
-          return hasActed && (hasMatchedBet || isAllIn);
-        });
-
-        console.log(`🎯 After fold - betting complete: ${bettingComplete}`);
-        console.log(`🎯 Active players status:`, activePlayers.map(p => ({
-          name: p.name,
-          proffered: p.proffered,
-          hasActed: p.lastAction !== null,
-          chips: p.chips
-        })));
-
-        if (bettingComplete) {
-          console.log('🎯 Betting complete after fold - advancing street');
-          setTimeout(() => startNewStreet(), 100);
-          return updatedPlayers;
-        } else {
-          // Find next active player for continued betting
-          const nextPlayerPosition = getNextActivePlayerPosition(activePlayer.position, updatedPlayers);
-          console.log(`🎯 Setting next active player to position ${nextPlayerPosition}`);
-          
-          return updatedPlayers.map(player => ({
-            ...player,
-            isActive: player.position === nextPlayerPosition && !player.isFolded && !player.isAnimatingFold
-          }));
-        }
-      });
-
-      // Complete the fold animation
-      setTimeout(() => {
-        setPlayers(prevPlayers => 
-          prevPlayers.map(player => 
-            player.id === activePlayer.id 
-              ? { ...player, isFolded: true, isAnimatingFold: false }
-              : player
-          )
-        );
-      }, 800);
-      
+      handleFoldAction(activePlayer, action, players, setPlayers, isBettingRoundComplete, startNewStreet);
       return;
     }
 
-    // Handle actions that involve money (call, raise, bet)
+    // Handle money actions (call, raise, bet)
     if (['call', 'raise', 'bet'].includes(action.type)) {
       setPot(prev => prev + actualAmount);
       
       setPlayers(prevPlayers => 
         prevPlayers.map(player => 
           player.id === activePlayer.id 
-            ? { 
-                ...player, 
-                chips: Math.max(0, player.chips - actualAmount),
-                proffered: totalProffered,
-                lastAction: { ...action, amount: actualAmount }
-              }
+            ? processMoneyAction(action, player, actualAmount, totalProffered)
             : player
         )
       );
-    } else if (action.type === 'check') {
+    } 
+    // Handle check action
+    else if (action.type === 'check') {
       setPlayers(prevPlayers => 
         prevPlayers.map(player => 
           player.id === activePlayer.id 
-            ? { ...player, lastAction: action }
+            ? processCheckAction(player, action, currentStreet, gameConfig, startNewStreet)
             : player
         )
       );
-
-      // Special case: BB checking their option ends preflop
-      if (isBigBlindOption(activePlayer, action.type, currentStreet, gameConfig.dealerPosition, gameConfig.bigBlind)) {
-        console.log('🎯 BB checked their option - moving to flop');
-        setTimeout(() => startNewStreet(), 100);
-        return;
-      }
     }
 
-    // Check if betting round is complete after this action
+    // Check for betting round completion after a delay
     setTimeout(() => {
-      setPlayers(currentPlayers => {
-        const currentActivePlayers = currentPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
-        
-        if (currentActivePlayers.length <= 1) {
-          console.log('🎯 Hand over - only one player remaining');
-          return currentPlayers.map(player => ({ ...player, isActive: false }));
-        }
-        
-        // Check if betting round is complete
-        const bettingComplete = isBettingRoundComplete(currentPlayers);
-        console.log(`🎯 Checking if betting round complete: ${bettingComplete}`);
-        console.log(`🎯 Player status for betting check:`, currentActivePlayers.map(p => ({
-          name: p.name,
-          proffered: p.proffered,
-          hasActed: p.lastAction !== null,
-          chips: p.chips,
-          isAllIn: p.chips === 0
-        })));
-        
-        if (bettingComplete) {
-          console.log('🎯 Betting round complete - moving to next street');
-          setTimeout(() => startNewStreet(), 50);
-          return currentPlayers.map(player => ({ ...player, isActive: false }));
-        } else {
-          console.log('🎯 Betting round not complete - moving to next player');
-          
-          // Find current active player and move to next
-          const currentActivePlayer = currentPlayers.find(p => p.isActive);
-          if (currentActivePlayer) {
-            const nextPosition = getNextActivePlayerPosition(currentActivePlayer.position, currentPlayers);
-            console.log(`🎯 Moving action from position ${currentActivePlayer.position} to position ${nextPosition}`);
+      setPlayers(currentPlayers => 
+        handleBettingRoundCompletion(
+          currentPlayers, 
+          isBettingRoundComplete, 
+          startNewStreet,
+          (pos, players) => {
+            // Find next active player
+            let nextPosition = (pos + 1) % 9;
+            let attempts = 0;
             
-            return currentPlayers.map(player => ({
-              ...player,
-              isActive: player.position === nextPosition && !player.isFolded && !player.isAnimatingFold
-            }));
+            while (attempts < 9) {
+              const nextPlayer = players.find(p => p.position === nextPosition);
+              if (nextPlayer && !nextPlayer.isFolded && !nextPlayer.isAnimatingFold) {
+                return nextPosition;
+              }
+              nextPosition = (nextPosition + 1) % 9;
+              attempts++;
+            }
+            return pos;
           }
-        }
-        
-        return currentPlayers;
-      });
+        )
+      );
     }, 150);
   };
 
-  // Save current hand - with authentication check
+  // Save current hand
   const saveCurrentHand = () => {
     if (!isAuthenticated()) {
-      console.log('🔒 User not authenticated, redirecting to login...');
       navigate('/login', {
         state: {
           from: { pathname: '/' },
@@ -566,10 +287,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       ante_amount: gameConfig.ante,
       small_blind_amount: gameConfig.smallBlind,
       big_blind_amount: gameConfig.bigBlind,
-      bet_limit: {
-        bet_cap: 0,
-        bet_type: "NL"
-      },
+      bet_limit: { bet_cap: 0, bet_type: "NL" },
       dealer_seat: gameConfig.dealerPosition + 1,
       hero_player_id: 1,
       players: players.map(player => ({
@@ -592,23 +310,19 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       }]
     };
     
-    console.log('🎯 Saving hand with rounds:', allRounds);
-    
-    saveHand(hand).then(() => {
-      console.log('🎯 Hand saved successfully');
-      startNewHand();
-    }).catch(error => {
-      console.error('❌ Error saving hand:', error);
-      
-      if (error.message?.includes('log in')) {
-        navigate('/login', {
-          state: {
-            from: { pathname: '/' },
-            message: error.message
-          }
-        });
-      }
-    });
+    saveHand(hand)
+      .then(() => {
+        console.log('🎯 Hand saved successfully');
+        startNewHand();
+      })
+      .catch(error => {
+        console.error('❌ Error saving hand:', error);
+        if (error.message?.includes('log in')) {
+          navigate('/login', {
+            state: { from: { pathname: '/' }, message: error.message }
+          });
+        }
+      });
   };
 
   return {

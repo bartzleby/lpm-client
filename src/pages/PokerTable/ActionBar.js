@@ -8,12 +8,13 @@ function ActionBar({
   currentBet,
   currentStreet,
   playersInHand,
+  pot, // Add pot as a prop instead of calculating it
   onAction, 
   isHandOver, 
   winningPlayer, 
   onSaveHand,
-  currentBettingRound, // Add this prop to get betting history
-  lastRaiseSize // Add this new prop to track the most recent raise size
+  currentBettingRound,
+  lastRaiseSize
 }) {
   const [showBetSlider, setShowBetSlider] = useState(false);
   const [showRaiseSlider, setShowRaiseSlider] = useState(false);
@@ -22,7 +23,7 @@ function ActionBar({
 
   // If hand is over, show winning message and save option
   if (isHandOver && winningPlayer) {
-    const potAmount = calculatePotAmount(playersInHand);
+    const totalPot = getCurrentTotalPot();
     return (
       <div className="action-section compact">
         <div className="action-buttons">
@@ -30,7 +31,7 @@ function ActionBar({
             className="action-button save-hand"
             onClick={onSaveHand}
           >
-            💾 {winningPlayer.name} wins ${potAmount}! Save Hand
+            💾 {winningPlayer.name} wins ${totalPot}! Save Hand
           </button>
         </div>
       </div>
@@ -174,9 +175,12 @@ function ActionBar({
     setRaiseAmount(0);
   };
 
-  // Calculate pot amount for display
-  function calculatePotAmount(players) {
-    return players.reduce((total, player) => total + (player.proffered || 0), 0);
+  // Calculate current total pot including this street's betting
+  function getCurrentTotalPot() {
+    const currentStreetBetting = playersInHand.reduce((total, player) => total + (player.proffered || 0), 0);
+    const totalPot = pot + currentStreetBetting;
+    console.log(`Current total pot: main pot ${pot} + current street ${currentStreetBetting} = ${totalPot}`);
+    return totalPot;
   }
 
   // Determine if player is facing a bet they need to call

@@ -48,6 +48,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
   // Start new street
   const startNewStreet = () => {
     console.log(`Ending ${currentStreet}, starting next street`);
+    console.log(`Current pot when ending street: ${pot}`);
     
     // Save current round
     setRounds(prevRounds => [...prevRounds, currentBettingRound]);
@@ -72,7 +73,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     const firstActivePosition = getFirstActivePlayerFromDealer(gameConfig.dealerPosition, players);
     console.log(`Setting first active player for ${nextStreet} to position ${firstActivePosition}`);
     
-    // Reset players for new street
+    // Reset players for new street - proffered amounts reset but pot remains
     setPlayers(prevPlayers => 
       prevPlayers.map(player => ({
         ...player,

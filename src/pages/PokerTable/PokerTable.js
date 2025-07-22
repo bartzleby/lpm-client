@@ -131,6 +131,7 @@ const PokerTable = () => {
             currentBet={handManager.currentBet}
             currentStreet={handManager.currentStreet}
             playersInHand={players}
+            pot={handManager.pot}
             onAction={handManager.handleAction}
             isHandOver={handManager.isHandOver()}
             winningPlayer={handManager.getWinningPlayer()}

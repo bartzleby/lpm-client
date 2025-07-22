@@ -1,4 +1,4 @@
-// src/hooks/useHandManager.js - Updated with fixed betting logic
+// src/hooks/useHandManager.js - Fixed street progression logic
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -23,7 +23,7 @@ import { isAuthenticated } from '../utils/auth';
 export const useHandManager = (gameConfig, players, setPlayers) => {
   const navigate = useNavigate();
   const [currentBet, setCurrentBet] = useState(0);
-  const [lastRaiseSize, setLastRaiseSize] = useState(0); // Track the size of the most recent raise
+  const [lastRaiseSize, setLastRaiseSize] = useState(0);
   const [rounds, setRounds] = useState([]);
   const [currentStreet, setCurrentStreet] = useState('preflop');
   const [actionNumber, setActionNumber] = useState(1);
@@ -45,10 +45,41 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     );
   };
 
+  // Check if betting round is complete
+  const isBettingRoundComplete = (currentPlayers) => {
+    const activePlayers = currentPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
+    
+    console.log(`🔍 Checking betting completion with ${activePlayers.length} active players`);
+    
+    if (activePlayers.length <= 1) {
+      console.log(`🔍 Hand over - only ${activePlayers.length} players left`);
+      return true; // Hand is over
+    }
+    
+    const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
+    console.log(`🔍 Highest bet is: ${highestBet}`);
+    
+    const playersStatus = activePlayers.map(player => {
+      const hasActed = player.lastAction !== null;
+      const hasMatchedBet = player.proffered === highestBet;
+      const isAllIn = player.chips === 0;
+      const isReady = hasActed && (hasMatchedBet || isAllIn);
+      
+      console.log(`🔍 ${player.name}: acted=${hasActed}, matched=${hasMatchedBet} (${player.proffered}/${highestBet}), allIn=${isAllIn}, ready=${isReady}`);
+      
+      return isReady;
+    });
+    
+    const allReady = playersStatus.every(status => status === true);
+    console.log(`🔍 All players ready: ${allReady}`);
+    
+    return allReady;
+  };
+
   // Start new street
   const startNewStreet = () => {
-    console.log(`Ending ${currentStreet}, starting next street`);
-    console.log(`Current pot when ending street: ${pot}`);
+    console.log(`🎯 Ending ${currentStreet}, starting next street`);
+    console.log(`🎯 Current pot when ending street: ${pot}`);
     
     // Save current round
     setRounds(prevRounds => [...prevRounds, currentBettingRound]);
@@ -58,30 +89,52 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     const nextStreet = streetNames[currentStreetIndex + 1];
     
     if (!nextStreet) {
-      console.log('No more streets - hand should be over');
+      console.log('🎯 No more streets - hand should be over');
       return;
     }
     
-    console.log(`Starting ${nextStreet}`);
+    console.log(`🎯 Starting ${nextStreet}`);
     setCurrentStreet(nextStreet);
     
     // Reset betting for new street
     setCurrentBet(0);
-    setLastRaiseSize(0); // Reset raise size for new street
-    
-    // Find first active player for new street
-    const firstActivePosition = getFirstActivePlayerFromDealer(gameConfig.dealerPosition, players);
-    console.log(`Setting first active player for ${nextStreet} to position ${firstActivePosition}`);
+    setLastRaiseSize(0);
     
     // Reset players for new street - proffered amounts reset but pot remains
-    setPlayers(prevPlayers => 
-      prevPlayers.map(player => ({
+    setPlayers(prevPlayers => {
+      // Find first active player for new street (must check current player states)
+      const activePlayers = prevPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
+      console.log(`🎯 Active players for ${nextStreet}:`, activePlayers.map(p => `${p.name}(${p.position})`));
+      
+      let firstActivePosition = null;
+      
+      // Start from small blind position and find first non-folded player
+      let position = (gameConfig.dealerPosition + 1) % 9; // Small blind position
+      let attempts = 0;
+      
+      while (attempts < 9) {
+        const player = activePlayers.find(p => p.position === position);
+        if (player) {
+          firstActivePosition = position;
+          console.log(`🎯 Found first active player for ${nextStreet}: ${player.name} at position ${position}`);
+          break;
+        }
+        position = (position + 1) % 9;
+        attempts++;
+      }
+      
+      if (firstActivePosition === null) {
+        console.log('🎯 ERROR: No active players found for new street!');
+        firstActivePosition = gameConfig.dealerPosition; // Fallback
+      }
+      
+      return prevPlayers.map(player => ({
         ...player,
         proffered: 0,
         lastAction: null,
-        isActive: player.position === firstActivePosition && !player.isFolded
-      }))
-    );
+        isActive: player.position === firstActivePosition && !player.isFolded && !player.isAnimatingFold
+      }));
+    });
     
     // Create new betting round
     setCurrentBettingRound({
@@ -106,7 +159,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       cards: cards
     };
 
-    // Record the dealt cards action
     setCurrentBettingRound(prevBettingRound => ({
       ...prevBettingRound,
       actions: [...prevBettingRound.actions, actionObj]
@@ -114,7 +166,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
     setActionNumber(prev => prev + 1);
 
-    // Update player's hand
     setPlayers(prevPlayers => 
       prevPlayers.map(player => 
         player.id === playerId 
@@ -123,14 +174,13 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       )
     );
 
-    console.log(`Dealt cards ${cards.join(', ')} to player ${playerId}`);
+    console.log(`🎯 Dealt cards ${cards.join(', ')} to player ${playerId}`);
   };
 
   // Deal community cards for a street
   const dealCommunityCards = (street, cards) => {
-    console.log(`Dealing community cards for ${street}: ${cards.join(', ')}`);
+    console.log(`🎯 Dealing community cards for ${street}: ${cards.join(', ')}`);
     
-    // Update current betting round with community cards
     setCurrentBettingRound(prevBettingRound => ({
       ...prevBettingRound,
       cards: cards
@@ -139,16 +189,14 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
   // Start recording a new hand
   const startNewHand = () => {
-    console.log('Starting new hand');
+    console.log('🎯 Starting new hand');
     
-    // Reset everything for new hand
     setCurrentStreet('preflop');
     setCurrentBet(gameConfig.bigBlind);
-    setLastRaiseSize(0); // Reset raise size for new hand
+    setLastRaiseSize(0);
     setRounds([]);
     clearActionBadges();
     
-    // Create initial betting round
     const initialBettingRound = {
       id: 0,
       street: "preflop",
@@ -156,21 +204,18 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       cards: []
     };
     
-    // Post forced bets and deduct from chip stacks
     const sbPos = getSmallBlindPosition(gameConfig.dealerPosition);
     const bbPos = getBigBlindPosition(gameConfig.dealerPosition);
     
     let nextActionNum = 1;
     const forcedBetActions = [];
     
-    // Update chip stacks for forced bets and record actions
     setPlayers(prevPlayers => 
       prevPlayers.map(player => {
         let newChips = player.starting_stack;
         let newProffered = 0;
         let newForcedBet = null;
         
-        // Reset player state
         const resetPlayer = {
           ...player,
           chips: player.starting_stack,
@@ -181,7 +226,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
           isActive: false
         };
         
-        // Post small blind
         if (player.position === sbPos && gameConfig.smallBlind > 0) {
           newChips -= gameConfig.smallBlind;
           newProffered += gameConfig.smallBlind;
@@ -196,7 +240,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
           });
         }
         
-        // Post big blind
         if (player.position === bbPos && gameConfig.bigBlind > 0) {
           newChips -= gameConfig.bigBlind;
           newProffered += gameConfig.bigBlind;
@@ -211,7 +254,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
           });
         }
         
-        // Post ante
         if (gameConfig.ante > 0 && player.starting_stack > 0) {
           newChips -= gameConfig.ante;
           newProffered += gameConfig.ante;
@@ -230,7 +272,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
           });
         }
         
-        // Post big blind ante
         if (gameConfig.isTournament && gameConfig.bigBlindAnte > 0 && player.position === bbPos) {
           newChips -= gameConfig.bigBlindAnte;
           newProffered += gameConfig.bigBlindAnte;
@@ -258,26 +299,22 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       })
     );
 
-    // Record dealt cards actions for hero
     forcedBetActions.push({
       action_number: nextActionNum++,
-      player_id: 1, // Hero's ID
+      player_id: 1,
       action: "Dealt Cards",
       amount: 0,
       is_allin: false,
       cards: []
     });
 
-    // Set the initial betting round with forced bet actions
     setCurrentBettingRound({
       ...initialBettingRound,
       actions: forcedBetActions
     });
 
-    // Set action number for next action
     setActionNumber(nextActionNum);
 
-    // Set initial active player (UTG for preflop)
     const firstActivePosition = getActivePlayerPosition(gameConfig.dealerPosition, 'preflop');
     setPlayers(prevPlayers => 
       prevPlayers.map(player => ({
@@ -286,7 +323,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       }))
     );
 
-    // Set initial pot with forced bets
     setPot(calculateInitialPot(
       gameConfig.smallBlind, 
       gameConfig.bigBlind, 
@@ -302,49 +338,42 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     const activePlayer = players.find(p => p.isActive && !p.isFolded);
     if (!activePlayer) return;
 
-    console.log(`Handling action: ${action.type} for ${activePlayer.name}`, action);
+    console.log(`🎯 Handling action: ${action.type} for ${activePlayer.name}`, action);
+    console.log(`🎯 Current street: ${currentStreet}, Current bet: ${currentBet}`);
 
-    // For bets and raises, we need to calculate the actual amount to deduct from chips
     let actualAmount = action.amount || 0;
     let totalProffered = activePlayer.proffered;
 
     if (action.type === 'bet') {
-      // Bet: player puts in the bet amount
       actualAmount = action.amount;
       totalProffered = action.amount;
       setCurrentBet(action.amount);
-      setLastRaiseSize(action.amount); // For first bet, raise size equals bet amount
+      setLastRaiseSize(action.amount);
       console.log(`🎯 BET: Setting current bet to ${action.amount}, raise size to ${action.amount}`);
     } else if (action.type === 'raise') {
-      // Raise: player raises TO the specified amount, so we need to calculate the difference
       const previousBet = currentBet;
       totalProffered = action.amount;
       actualAmount = action.amount - activePlayer.proffered;
       const raiseSize = action.amount - previousBet;
       setCurrentBet(action.amount);
-      setLastRaiseSize(raiseSize); // Track the actual raise size
+      setLastRaiseSize(raiseSize);
       console.log(`🎯 RAISE: Setting current bet to ${action.amount}, previous bet was ${previousBet}, raise size: ${raiseSize}, actual amount deducted: ${actualAmount}`);
     } else if (action.type === 'call') {
-      // Call: player calls the current bet
       actualAmount = currentBet - activePlayer.proffered;
       totalProffered = currentBet;
-      // Don't change lastRaiseSize for calls
       console.log(`🎯 CALL: Current bet is ${currentBet}, actual amount deducted: ${actualAmount}`);
     }
 
-    // Create proper action object for recording
     const actionObj = {
       action_number: actionNumber,
       player_id: activePlayer.id,
       action: action.type,
-      amount: action.type === 'call' ? totalProffered : (action.type === 'bet' || action.type === 'raise' ? totalProffered : (action.amount || 0)), // Record the total amount bet/raised to
+      amount: action.type === 'call' ? totalProffered : (action.type === 'bet' || action.type === 'raise' ? totalProffered : (action.amount || 0)),
       is_allin: action.allIn || false
     };
 
     console.log('🎯 Recording action:', actionObj);
-    console.log('🎯 Current betting round before adding action:', currentBettingRound);
 
-    // Record action in current betting round
     setCurrentBettingRound(prevBettingRound => {
       const updatedRound = {
         ...prevBettingRound,
@@ -356,12 +385,10 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
     setActionNumber(prev => prev + 1);
 
-    // Handle fold action
+    // Handle fold action - SPECIAL CASE: Check for betting completion immediately after fold
     if (action.type === 'fold') {
-      const nextPlayerPosition = getNextActivePlayerPosition(activePlayer.position, players);
-      
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => {
+      setPlayers(prevPlayers => {
+        const updatedPlayers = prevPlayers.map(player => {
           if (player.id === activePlayer.id) {
             return { 
               ...player, 
@@ -369,31 +396,61 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
               isActive: false,
               lastAction: action
             };
-          } else if (player.position === nextPlayerPosition) {
-            return { ...player, isActive: true };
-          } else {
-            return { ...player, isActive: false };
           }
-        })
-      );
+          return { ...player, isActive: false };
+        });
 
-      // Complete the fold after animation
+        // Check if betting is complete after this fold (before setting next active player)
+        const activePlayers = updatedPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
+        console.log(`🎯 After fold, ${activePlayers.length} players remain`);
+        
+        if (activePlayers.length <= 1) {
+          console.log('🎯 Hand over after fold - only one player remaining');
+          return updatedPlayers;
+        }
+        
+        // Check if betting round is complete after this fold
+        const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
+        const bettingComplete = activePlayers.every(player => {
+          const hasActed = player.lastAction !== null;
+          const hasMatchedBet = player.proffered === highestBet;
+          const isAllIn = player.chips === 0;
+          return hasActed && (hasMatchedBet || isAllIn);
+        });
+
+        console.log(`🎯 After fold - betting complete: ${bettingComplete}`);
+        console.log(`🎯 Active players status:`, activePlayers.map(p => ({
+          name: p.name,
+          proffered: p.proffered,
+          hasActed: p.lastAction !== null,
+          chips: p.chips
+        })));
+
+        if (bettingComplete) {
+          console.log('🎯 Betting complete after fold - advancing street');
+          setTimeout(() => startNewStreet(), 100);
+          return updatedPlayers;
+        } else {
+          // Find next active player for continued betting
+          const nextPlayerPosition = getNextActivePlayerPosition(activePlayer.position, updatedPlayers);
+          console.log(`🎯 Setting next active player to position ${nextPlayerPosition}`);
+          
+          return updatedPlayers.map(player => ({
+            ...player,
+            isActive: player.position === nextPlayerPosition && !player.isFolded && !player.isAnimatingFold
+          }));
+        }
+      });
+
+      // Complete the fold animation
       setTimeout(() => {
-        setPlayers(prevPlayers => {
-          const updatedPlayers = prevPlayers.map(player => 
+        setPlayers(prevPlayers => 
+          prevPlayers.map(player => 
             player.id === activePlayer.id 
               ? { ...player, isFolded: true, isAnimatingFold: false }
               : player
-          );
-          
-          // Check if hand is over after this fold
-          const remainingCount = updatedPlayers.filter(p => !p.isFolded).length;
-          if (remainingCount <= 1) {
-            return updatedPlayers.map(player => ({ ...player, isActive: false }));
-          }
-          
-          return updatedPlayers;
-        });
+          )
+        );
       }, 800);
       
       return;
@@ -410,7 +467,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
                 ...player, 
                 chips: Math.max(0, player.chips - actualAmount),
                 proffered: totalProffered,
-                lastAction: { ...action, amount: actualAmount } // Store the actual amount deducted
+                lastAction: { ...action, amount: actualAmount }
               }
             : player
         )
@@ -426,7 +483,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
       // Special case: BB checking their option ends preflop
       if (isBigBlindOption(activePlayer, action.type, currentStreet, gameConfig.dealerPosition, gameConfig.bigBlind)) {
-        console.log('BB checked their option - moving to flop');
+        console.log('🎯 BB checked their option - moving to flop');
         setTimeout(() => startNewStreet(), 100);
         return;
       }
@@ -434,51 +491,42 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
     // Check if betting round is complete after this action
     setTimeout(() => {
-      const currentActivePlayers = players.filter(p => !p.isFolded);
-      if (currentActivePlayers.length <= 1) {
-        console.log('Hand over - only one player remaining');
-        return;
-      }
-      
       setPlayers(currentPlayers => {
-        const activePlayers = currentPlayers.filter(p => !p.isFolded);
-        const highestBet = Math.max(...activePlayers.map(p => p.proffered || 0));
+        const currentActivePlayers = currentPlayers.filter(p => !p.isFolded && !p.isAnimatingFold);
         
-        const allPlayersReady = activePlayers.every(player => {
-          const hasActed = player.lastAction !== null;
-          const hasMatchedBet = player.proffered === highestBet;
-          const isAllIn = player.chips === 0;
-          
-          return hasActed && (hasMatchedBet || isAllIn);
-        });
+        if (currentActivePlayers.length <= 1) {
+          console.log('🎯 Hand over - only one player remaining');
+          return currentPlayers.map(player => ({ ...player, isActive: false }));
+        }
         
-        if (allPlayersReady) {
-          console.log('Betting round complete - moving to next street');
+        // Check if betting round is complete
+        const bettingComplete = isBettingRoundComplete(currentPlayers);
+        console.log(`🎯 Checking if betting round complete: ${bettingComplete}`);
+        console.log(`🎯 Player status for betting check:`, currentActivePlayers.map(p => ({
+          name: p.name,
+          proffered: p.proffered,
+          hasActed: p.lastAction !== null,
+          chips: p.chips,
+          isAllIn: p.chips === 0
+        })));
+        
+        if (bettingComplete) {
+          console.log('🎯 Betting round complete - moving to next street');
           setTimeout(() => startNewStreet(), 50);
+          return currentPlayers.map(player => ({ ...player, isActive: false }));
         } else {
-          console.log('Betting round not complete - moving to next player');
-          const currentActiveIndex = currentPlayers.findIndex(player => player.isActive);
-          if (currentActiveIndex !== -1) {
-            let nextPosition = (currentPlayers[currentActiveIndex].position + 1) % 9;
-            let attempts = 0;
+          console.log('🎯 Betting round not complete - moving to next player');
+          
+          // Find current active player and move to next
+          const currentActivePlayer = currentPlayers.find(p => p.isActive);
+          if (currentActivePlayer) {
+            const nextPosition = getNextActivePlayerPosition(currentActivePlayer.position, currentPlayers);
+            console.log(`🎯 Moving action from position ${currentActivePlayer.position} to position ${nextPosition}`);
             
-            while (attempts < 9) {
-              const nextPlayer = currentPlayers.find(p => p.position === nextPosition);
-              if (nextPlayer && !nextPlayer.isFolded) {
-                break;
-              }
-              nextPosition = (nextPosition + 1) % 9;
-              attempts++;
-            }
-            
-            setTimeout(() => {
-              setPlayers(prevPlayers => 
-                prevPlayers.map(player => ({
-                  ...player,
-                  isActive: player.position === nextPosition && !player.isFolded
-                }))
-              );
-            }, 50);
+            return currentPlayers.map(player => ({
+              ...player,
+              isActive: player.position === nextPosition && !player.isFolded && !player.isAnimatingFold
+            }));
           }
         }
         
@@ -489,7 +537,6 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
   // Save current hand - with authentication check
   const saveCurrentHand = () => {
-    // Check if user is authenticated before saving
     if (!isAuthenticated()) {
       console.log('🔒 User not authenticated, redirecting to login...');
       navigate('/login', {
@@ -545,15 +592,14 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
       }]
     };
     
-    console.log('Saving hand with rounds:', allRounds);
+    console.log('🎯 Saving hand with rounds:', allRounds);
     
     saveHand(hand).then(() => {
-      console.log('Hand saved successfully');
+      console.log('🎯 Hand saved successfully');
       startNewHand();
     }).catch(error => {
-      console.error('Error saving hand:', error);
+      console.error('❌ Error saving hand:', error);
       
-      // Handle authentication errors specifically
       if (error.message?.includes('log in')) {
         navigate('/login', {
           state: {
@@ -572,7 +618,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     rounds,
     currentBettingRound,
     actionNumber,
-    lastRaiseSize, // Add this to the returned values
+    lastRaiseSize,
     startNewHand,
     handleAction,
     saveCurrentHand,

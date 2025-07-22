@@ -135,6 +135,8 @@ const PokerTable = () => {
             isHandOver={handManager.isHandOver()}
             winningPlayer={handManager.getWinningPlayer()}
             onSaveHand={handManager.saveCurrentHand}
+            currentBettingRound={handManager.currentBettingRound}
+            lastRaiseSize={handManager.lastRaiseSize}
           />
         </div>
       </div>

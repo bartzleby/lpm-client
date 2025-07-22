@@ -1,4 +1,4 @@
-// src/hooks/useHandManager.js - Updated with authentication check
+// src/hooks/useHandManager.js - Updated with fixed betting logic
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,7 @@ import { isAuthenticated } from '../utils/auth';
 export const useHandManager = (gameConfig, players, setPlayers) => {
   const navigate = useNavigate();
   const [currentBet, setCurrentBet] = useState(0);
+  const [lastRaiseSize, setLastRaiseSize] = useState(0); // Track the size of the most recent raise
   const [rounds, setRounds] = useState([]);
   const [currentStreet, setCurrentStreet] = useState('preflop');
   const [actionNumber, setActionNumber] = useState(1);
@@ -65,6 +66,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     
     // Reset betting for new street
     setCurrentBet(0);
+    setLastRaiseSize(0); // Reset raise size for new street
     
     // Find first active player for new street
     const firstActivePosition = getFirstActivePlayerFromDealer(gameConfig.dealerPosition, players);
@@ -141,6 +143,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     // Reset everything for new hand
     setCurrentStreet('preflop');
     setCurrentBet(gameConfig.bigBlind);
+    setLastRaiseSize(0); // Reset raise size for new hand
     setRounds([]);
     clearActionBadges();
     
@@ -298,22 +301,57 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     const activePlayer = players.find(p => p.isActive && !p.isFolded);
     if (!activePlayer) return;
 
-    console.log(`Handling action: ${action.type} for ${activePlayer.name}`);
+    console.log(`Handling action: ${action.type} for ${activePlayer.name}`, action);
+
+    // For bets and raises, we need to calculate the actual amount to deduct from chips
+    let actualAmount = action.amount || 0;
+    let totalProffered = activePlayer.proffered;
+
+    if (action.type === 'bet') {
+      // Bet: player puts in the bet amount
+      actualAmount = action.amount;
+      totalProffered = action.amount;
+      setCurrentBet(action.amount);
+      setLastRaiseSize(action.amount); // For first bet, raise size equals bet amount
+      console.log(`🎯 BET: Setting current bet to ${action.amount}, raise size to ${action.amount}`);
+    } else if (action.type === 'raise') {
+      // Raise: player raises TO the specified amount, so we need to calculate the difference
+      const previousBet = currentBet;
+      totalProffered = action.amount;
+      actualAmount = action.amount - activePlayer.proffered;
+      const raiseSize = action.amount - previousBet;
+      setCurrentBet(action.amount);
+      setLastRaiseSize(raiseSize); // Track the actual raise size
+      console.log(`🎯 RAISE: Setting current bet to ${action.amount}, previous bet was ${previousBet}, raise size: ${raiseSize}, actual amount deducted: ${actualAmount}`);
+    } else if (action.type === 'call') {
+      // Call: player calls the current bet
+      actualAmount = currentBet - activePlayer.proffered;
+      totalProffered = currentBet;
+      // Don't change lastRaiseSize for calls
+      console.log(`🎯 CALL: Current bet is ${currentBet}, actual amount deducted: ${actualAmount}`);
+    }
 
     // Create proper action object for recording
     const actionObj = {
       action_number: actionNumber,
       player_id: activePlayer.id,
       action: mapActionTypeToOHH(action.type),
-      amount: action.amount || 0,
+      amount: action.type === 'call' ? totalProffered : (action.type === 'bet' || action.type === 'raise' ? totalProffered : (action.amount || 0)), // Record the total amount bet/raised to
       is_allin: action.allIn || false
     };
 
+    console.log('🎯 Recording action:', actionObj);
+    console.log('🎯 Current betting round before adding action:', currentBettingRound);
+
     // Record action in current betting round
-    setCurrentBettingRound(prevBettingRound => ({
-      ...prevBettingRound,
-      actions: [...prevBettingRound.actions, actionObj]
-    }));
+    setCurrentBettingRound(prevBettingRound => {
+      const updatedRound = {
+        ...prevBettingRound,
+        actions: [...prevBettingRound.actions, actionObj]
+      };
+      console.log('🎯 Updated betting round after adding action:', updatedRound);
+      return updatedRound;
+    });
 
     setActionNumber(prev => prev + 1);
 
@@ -362,23 +400,16 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
     // Handle actions that involve money (call, raise, bet)
     if (['call', 'raise', 'bet'].includes(action.type)) {
-      const actionAmount = action.amount || 0;
-      const newTotalProffered = activePlayer.proffered + actionAmount;
-      
-      setPot(prev => prev + actionAmount);
-      
-      if (action.type === 'raise' || action.type === 'bet') {
-        setCurrentBet(newTotalProffered);
-      }
+      setPot(prev => prev + actualAmount);
       
       setPlayers(prevPlayers => 
         prevPlayers.map(player => 
           player.id === activePlayer.id 
             ? { 
                 ...player, 
-                chips: Math.max(0, player.chips - actionAmount),
-                proffered: newTotalProffered,
-                lastAction: action
+                chips: Math.max(0, player.chips - actualAmount),
+                proffered: totalProffered,
+                lastAction: { ...action, amount: actualAmount } // Store the actual amount deducted
               }
             : player
         )
@@ -540,6 +571,7 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
     rounds,
     currentBettingRound,
     actionNumber,
+    lastRaiseSize, // Add this to the returned values
     startNewHand,
     handleAction,
     saveCurrentHand,

@@ -11,9 +11,13 @@ function ActionBar({
   onAction, 
   isHandOver, 
   winningPlayer, 
-  onSaveHand 
+  onSaveHand,
+  currentBettingRound, // Add this prop to get betting history
+  lastRaiseSize // Add this new prop to track the most recent raise size
 }) {
+  const [showBetSlider, setShowBetSlider] = useState(false);
   const [showRaiseSlider, setShowRaiseSlider] = useState(false);
+  const [betAmount, setBetAmount] = useState(0);
   const [raiseAmount, setRaiseAmount] = useState(0);
 
   // If hand is over, show winning message and save option
@@ -44,33 +48,125 @@ function ActionBar({
     );
   }
 
+  // Calculate betting history for this street
+  const getBettingHistory = () => {
+    if (!currentBettingRound || !currentBettingRound.actions) return [];
+    
+    // Get all betting actions in chronological order (not sorted by amount)
+    // Include both "Bet" and "Raise" actions, plus forced bets on preflop
+    const bettingActions = currentBettingRound.actions
+      .filter(action => {
+        // Include bets and raises
+        if (['Bet', 'Raise'].includes(action.action)) return true;
+        
+        // On preflop, also include big blind as the initial "bet"
+        if (currentStreet === 'preflop' && action.action === 'Post BB') return true;
+        
+        return false;
+      })
+      .map(action => action.amount);
+      
+    console.log('🔍 Raw betting actions from current round:', currentBettingRound.actions);
+    console.log('🔍 Filtered betting history:', bettingActions);
+    
+    return bettingActions;
+  };
+
+  // Calculate minimum raise according to poker rules
+  const calculateMinimumRaise = () => {
+    console.log('🎯 Calculating minimum raise:');
+    console.log('  Current bet:', currentBet);
+    console.log('  Current street:', currentStreet);
+    console.log('  Big blind:', bigBlindAmount);
+    console.log('  Last raise size:', lastRaiseSize);
+    
+    if (currentStreet === 'preflop') {
+      if (currentBet === bigBlindAmount) {
+        // Only big blind has been posted - minimum raise is double big blind
+        const minRaise = bigBlindAmount * 2;
+        console.log('  Preflop - only BB posted, min raise:', minRaise);
+        return minRaise;
+      } else {
+        // Someone has raised - use the last raise size (if available) or calculate from BB
+        const raiseSize = lastRaiseSize || (currentBet - bigBlindAmount);
+        const minRaise = currentBet + raiseSize;
+        console.log(`  Preflop - current bet: ${currentBet}, last raise size: ${raiseSize}, min raise: ${minRaise}`);
+        return minRaise;
+      }
+    } else {
+      // Post-flop streets
+      if (currentBet === 0) {
+        // No bets this street - minimum raise is double big blind
+        const minRaise = bigBlindAmount * 2;
+        console.log('  Post-flop - no bets, min raise:', minRaise);
+        return minRaise;
+      } else {
+        // Someone has bet - use last raise size or default to current bet size
+        const raiseSize = lastRaiseSize || currentBet;
+        const minRaise = currentBet + raiseSize;
+        console.log(`  Post-flop - current bet: ${currentBet}, last raise size: ${raiseSize}, min raise: ${minRaise}`);
+        return minRaise;
+      }
+    }
+  };
+
+  // Calculate minimum bet (when no one has bet)
+  const calculateMinimumBet = () => {
+    return bigBlindAmount;
+  };
+
   console.log(`ActionBar: Current player is ${currentPlayer.name} at position ${currentPlayer.position}`);
   console.log(`Current street: ${currentStreet}, current bet: ${currentBet}, player proffered: ${currentPlayer.proffered}`);
+  console.log('🔍 Current betting round:', currentBettingRound);
+  console.log('🔍 Betting history:', getBettingHistory());
 
   const handleAction = (action) => {
     if (onAction) {
       onAction(action);
     }
     // Reset all inputs
+    setShowBetSlider(false);
     setShowRaiseSlider(false);
+    setBetAmount(0);
     setRaiseAmount(0);
   };
 
+  const handleBetClick = () => {
+    const minBet = calculateMinimumBet();
+    setBetAmount(minBet);
+    setShowBetSlider(true);
+  };
+
   const handleRaiseClick = () => {
-    // Calculate default raise amount based on current bet
-    const minRaise = currentBet === 0 ? bigBlindAmount : currentBet * 2;
+    const minRaise = calculateMinimumRaise();
+    console.log('🚀 Raise button clicked - setting minimum raise to:', minRaise);
     setRaiseAmount(minRaise);
     setShowRaiseSlider(true);
+  };
+
+  const handleBetSubmit = () => {
+    if (betAmount > 0) {
+      handleAction({
+        type: 'bet',
+        amount: betAmount,
+        allIn: betAmount >= currentPlayer.chips
+      });
+    }
   };
 
   const handleRaiseSubmit = () => {
     if (raiseAmount > 0) {
       handleAction({
         type: 'raise',
-        amount: raiseAmount,
-        allIn: raiseAmount >= currentPlayer.chips
+        amount: raiseAmount, // Pass the total raise amount, not the difference
+        allIn: (raiseAmount - currentPlayer.proffered) >= currentPlayer.chips
       });
     }
+  };
+
+  const handleCancelBet = () => {
+    setShowBetSlider(false);
+    setBetAmount(0);
   };
 
   const handleCancelRaise = () => {
@@ -99,11 +195,54 @@ function ActionBar({
   
   console.log(`${currentPlayer.name} needs to call: ${needsToCall}, is BB option: ${isBigBlindOption()}`);
   
-  // Calculate slider bounds for raises
-  const minRaise = currentBet === 0 ? bigBlindAmount : currentBet * 2;
+  // Calculate slider bounds
+  const minBet = calculateMinimumBet();
+  const maxBet = currentPlayer.chips;
+  const minRaise = calculateMinimumRaise();
   const maxRaise = currentPlayer.chips;
 
-  // Show raise slider instead of main buttons
+  // Show bet slider
+  if (showBetSlider) {
+    return (
+      <div className="action-section compact">
+        <div className="raise-slider-section">
+          <div className="raise-info">
+            <span>Bet: ${betAmount}</span>
+            <span className="raise-detail">All-in: {betAmount >= currentPlayer.chips ? 'Yes' : 'No'}</span>
+          </div>
+          <input
+            type="range"
+            className="raise-slider"
+            min={minBet}
+            max={maxBet}
+            value={betAmount}
+            onChange={(e) => setBetAmount(parseInt(e.target.value))}
+            step={bigBlindAmount}
+          />
+          <div className="slider-labels">
+            <span>Min: ${minBet}</span>
+            <span>Max: ${maxBet}</span>
+          </div>
+          <div className="action-buttons raise-actions">
+            <button 
+              className="action-button cancel"
+              onClick={handleCancelBet}
+            >
+              Cancel
+            </button>
+            <button 
+              className="action-button raise-submit"
+              onClick={handleBetSubmit}
+            >
+              Bet ${betAmount}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show raise slider
   if (showRaiseSlider) {
     return (
       <div className="action-section compact">
@@ -219,13 +358,9 @@ function ActionBar({
             
             <button 
               className="action-button bet"
-              onClick={() => handleAction({
-                type: 'bet',
-                amount: currentBet === 0 ? bigBlindAmount : currentBet,
-                allIn: false
-              })}
+              onClick={handleBetClick}
             >
-              Bet ${currentBet === 0 ? bigBlindAmount : currentBet}
+              Bet
             </button>
           </>
         )}

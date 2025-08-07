@@ -1,9 +1,14 @@
 // src/App.js - Updated with authentication routes
 import './App.css';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+
 import PokerTable from './pages/PokerTable/PokerTable';
 import LoginPage from './pages/auth/LoginPage';
 import SignUpPage from './pages/auth/SignUpPage';
+
+import Dashboard from './pages/Dashboard/Dashboard';
+import Profile from './pages/Profile/Profile';
+
 
 function App() {
   return (
@@ -17,8 +22,13 @@ function App() {
         <Route path="/signup" element={<SignUpPage />} />
         
         {/* Future protected routes can go here */}
-        {/* <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} /> */}
-        {/* <Route path="/hands" element={<ProtectedRoute><HandHistory /></ProtectedRoute>} /> */}
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
+
+        {/* Default redirects */}
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+        {/* <Route path="*" element={<NotFound />} /> */}
+
       </Routes>
     </div>
   );

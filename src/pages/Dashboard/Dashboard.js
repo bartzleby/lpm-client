@@ -2,9 +2,12 @@
 
 import React from 'react';
 import './Dashboard.css';
+import PageLayout from '../../components/Layout/PageLayout';
+
 
 const Dashboard = () => {
   return (
+    <PageLayout>
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h1>Dashboard</h1>
@@ -44,6 +47,7 @@ const Dashboard = () => {
         </div>
       </div>
     </div>
+    </PageLayout>
   );
 };
 

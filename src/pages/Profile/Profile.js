@@ -1,6 +1,8 @@
 // src/pages/Profile/Profile.js
 import React, { useState } from 'react';
 import './Profile.css';
+import PageLayout from '../../components/Layout/PageLayout';
+
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState('account');
@@ -20,6 +22,7 @@ const Profile = () => {
   };
 
   return (
+    <PageLayout>
     <div className="profile-container">
       <div className="profile-header">
         <h1>Profile</h1>
@@ -137,6 +140,7 @@ const Profile = () => {
         </div>
       )}
     </div>
+    </PageLayout>
   );
 };
 

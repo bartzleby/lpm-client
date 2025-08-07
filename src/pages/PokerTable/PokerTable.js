@@ -10,6 +10,8 @@ import GameInfoDisplay from './GameInfoDisplay';
 import { useHandManager } from '../../hooks/useHandManager';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 import './PokerTable.css';
+import PageLayout from '../../components/Layout/PageLayout';
+
 
 const PokerTable = () => {
   // Game configuration state
@@ -77,6 +79,7 @@ const PokerTable = () => {
   }, [handManager.dealCardsToPlayer, handManager.dealCommunityCards]);
 
   return (
+    <PageLayout className="page-layout--fullscreen">
     <div className={`poker-wrapper ${isMobile ? 'mobile' : 'desktop'}`}>
       {/* Main content wrapper */}
       <div className={`main-content ${getLayoutClass()}`}>
@@ -142,6 +145,7 @@ const PokerTable = () => {
         </div>
       </div>
     </div>
+    </PageLayout>
   );
 };
 

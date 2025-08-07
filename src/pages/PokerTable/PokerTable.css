@@ -443,3 +443,110 @@
     width: 100%;
   }
 }
+
+
+/* src/pages/PokerTable/PokerTable.css - Mobile layout adjustments */
+
+/* Keep existing desktop styles, add these mobile-specific adjustments */
+
+/* Mobile layout adjustments for action bar clearance */
+@media (max-width: 768px) {
+  .poker-wrapper {
+    padding: 0.5rem;
+    padding-bottom: 140px; /* Increased space for action section + navigation */
+    /* Center content higher up on screen */
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+  
+  .main-content.mobile-layout .table-section {
+    flex: 1;
+    display: flex;
+    align-items: flex-start; /* Changed from center to flex-start */
+    justify-content: center;
+    position: relative;
+    /* Move table section up */
+    transform: translateY(-2rem);
+  }
+  
+  .poker-table-container {
+    max-width: 90vw;
+    max-height: 70vh; /* Increased table height since we have more room */
+    margin-top: 0; /* Remove negative margin, we're translating instead */
+    /* Additional upward adjustment */
+    transform: translateY(-1rem);
+  }
+  
+  /* Ensure ActionBar has proper positioning */
+  .main-content.mobile-layout .action-section-mobile {
+    bottom: 60px; /* Above bottom navigation */
+    background: rgba(0, 0, 0, 0.95);
+    padding: 0.75rem; /* Slightly reduced padding */
+    gap: 0.5rem;
+    /* Ensure it doesn't interfere with table */
+    z-index: 150;
+  }
+  
+  /* Move config panel down to avoid overlap */
+  .config-panel {
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+    padding: 1rem;
+    max-height: 80vh; /* Limit height to avoid action bar */
+  }
+  
+  /* Adjust other UI elements */
+  .settings-btn {
+    top: 1rem;
+    left: 1rem;
+  }
+  
+  .recording-controls {
+    top: 1rem;
+    right: 1rem;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+  
+  .game-info {
+    bottom: auto;
+    top: 4rem; /* Moved down to avoid config panel */
+    right: 1rem;
+    font-size: 0.625rem;
+  }
+}
+
+/* Additional mobile adjustments for very small screens */
+@media (max-width: 640px) {
+  .poker-wrapper {
+    padding-top: 1rem;
+  }
+  
+  .main-content.mobile-layout .table-section {
+    transform: translateY(-1.5rem); /* Less aggressive transform on smaller screens */
+  }
+  
+  .poker-table-container {
+    max-height: 65vh;
+    transform: translateY(-0.5rem);
+  }
+}
+
+/* Landscape mode adjustments for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .poker-wrapper {
+    padding-top: 0.5rem;
+    padding-bottom: 120px;
+  }
+  
+  .main-content.mobile-layout .table-section {
+    transform: translateY(-1rem);
+  }
+  
+  .poker-table-container {
+    max-height: 75vh;
+    transform: none;
+  }
+}

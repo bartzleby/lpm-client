@@ -1,3 +1,5 @@
+// src/pages/PokerTable/HeroBox.js - Mobile positioning adjustment
+
 import React from 'react';
 import './HeroBox.css';
 
@@ -10,7 +12,15 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
         const radiusY = 200; // Vertical radius (larger for oval)
         
         const x = Math.cos(radians) * radiusX;
-        const y = Math.sin(radians) * radiusY;
+        let y = Math.sin(radians) * radiusY;
+        
+        // Mobile adjustment: shift all players up
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            // Shift all players up, with hero (position 0) getting extra clearance
+            const mobileYOffset = position === 0 ? -80 : -48; // Hero gets -80px, others get -48px
+            y += mobileYOffset;
+        }
         
         return {
             left: `calc(50% + ${x}px)`,
@@ -48,11 +58,10 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
         return display.join(' + ');
     };
 
-    // Format action badge display - FIXED VERSION
+    // Format action badge display
     const formatActionBadge = (lastAction) => {
         if (!lastAction) return null;
         
-        // Handle both old format (action.action) and new format (action.type)
         const actionType = lastAction.type || lastAction.action;
         const actionAmount = lastAction.amount || 0;
         
@@ -67,73 +76,44 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
                 return `BET $${actionAmount}`;
             case 'raise':
                 return `RAISE $${actionAmount}`;
+            case 'all-in':
             case 'allin':
-            case 'all in':
-                return `ALL IN $${actionAmount}`;
-            case 'post sb':
-                return `SB $${actionAmount}`;
-            case 'post bb':
-                return `BB $${actionAmount}`;
-            case 'post ante':
-                return `ANTE $${actionAmount}`;
+                return `ALL-IN $${actionAmount}`;
             default:
-                // Fallback for any unhandled action types
                 return actionType?.toUpperCase() || '';
         }
     };
 
-    // Get action badge color based on action type - UPDATED
-    const getActionBadgeColor = (actionType) => {
-        const type = (actionType?.type || actionType?.action || actionType)?.toLowerCase();
+    // Get action badge color
+    const getActionBadgeColor = (lastAction) => {
+        if (!lastAction) return '#374151';
         
-        switch (type) {
+        const actionType = lastAction.type || lastAction.action;
+        switch (actionType?.toLowerCase()) {
             case 'fold':
                 return '#ef4444'; // Red
             case 'check':
                 return '#6b7280'; // Gray
             case 'call':
-                return '#3b82f6'; // Blue
+                return '#57534e'; // Brown
             case 'bet':
             case 'raise':
-                return '#10b981'; // Green
+                return '#059669'; // Green
+            case 'all-in':
             case 'allin':
-            case 'all in':
-                return '#f59e0b'; // Amber
-            case 'post sb':
-            case 'post bb':
-            case 'post ante':
-                return '#8b5cf6'; // Purple for forced bets
+                return '#dc2626'; // Red
             default:
-                return '#6b7280'; // Default gray
+                return '#374151'; // Default gray
         }
-    };
-
-    // Determine player circle class
-    const getPlayerCircleClass = () => {
-        let baseClass = 'player-circle';
-        
-        if (player.isFolded) {
-            baseClass += ' folded';
-        } else if (player.isActive) {
-            baseClass += ' active';
-        } else {
-            baseClass += ' inactive';
-        }
-        
-        if (isHero) {
-            baseClass += ' hero';
-        }
-        
-        return baseClass;
     };
 
     return (
-        <div
-            className="hero-box-container"
+        <div 
+            className="hero-box-container" 
             style={getPlayerPosition()}
         >
             {/* Player circle */}
-            <div className={getPlayerCircleClass()}>
+            <div className={`player-circle ${player.isActive ? 'active' : 'inactive'} ${isHero ? 'hero' : ''} ${player.isFolded ? 'folded' : ''}`}>
                 {/* Player avatar */}
                 <div className="player-avatar">
                     {isHero ? '👤' : '🎭'}

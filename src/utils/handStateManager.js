@@ -1,7 +1,7 @@
-// src/utils/handStateManager.js - Hand state initialization and management
+// src/utils/handStateManager.js - FIXED VERSION
+// Hand state initialization and management
 
 import { 
-  getActivePlayerPosition, 
   getSmallBlindPosition, 
   getBigBlindPosition,
   calculateInitialPot,
@@ -132,32 +132,83 @@ export const resetPlayersForNewStreet = (players, dealerPosition, nextStreet) =>
   // Find active players (excluding folded and animating)
   const activePlayers = players.filter(p => !p.isFolded && !p.isAnimatingFold);
   console.log(`🎯 Active players for ${nextStreet}:`, activePlayers.map(p => `${p.name}(${p.position})`));
+  console.log(`🎯 Dealer position: ${dealerPosition}`);
   
-  // Find first active player for new street
   let firstActivePosition = null;
-  let position = (dealerPosition + 1) % 9; // Start from small blind
-  let attempts = 0;
   
-  while (attempts < 9) {
-    const player = activePlayers.find(p => p.position === position);
-    if (player) {
-      firstActivePosition = position;
-      console.log(`🎯 Found first active player for ${nextStreet}: ${player.name} at position ${position}`);
-      break;
+  if (nextStreet === 'preflop') {
+    // Preflop: start with UTG (dealer + 3)
+    let position = (dealerPosition + 3) % 9;
+    let attempts = 0;
+    
+    while (attempts < 9) {
+      const player = activePlayers.find(p => p.position === position);
+      if (player) {
+        firstActivePosition = position;
+        console.log(`🎯 Found first active player for ${nextStreet}: ${player.name} at position ${position}`);
+        break;
+      }
+      position = (position + 1) % 9;
+      attempts++;
     }
-    position = (position + 1) % 9;
-    attempts++;
+  } else {
+    // Post-flop: Start from position AFTER dealer and find first active player
+    // This ensures we go: SB(dealer+1), BB(dealer+2), UTG(dealer+3), etc.
+    let position = (dealerPosition + 1) % 9; // Start from Small Blind position
+    let attempts = 0;
+    
+    console.log(`🎯 Post-flop: Looking for first active player starting from position ${position} (SB)`);
+    
+    while (attempts < 9) {
+      const player = activePlayers.find(p => p.position === position);
+      if (player) {
+        firstActivePosition = position;
+        console.log(`🎯 ✅ Found first active player for ${nextStreet}: ${player.name} at position ${position}`);
+        
+        // Debug info
+        const sbPos = (dealerPosition + 1) % 9;
+        const bbPos = (dealerPosition + 2) % 9;
+        
+        if (position === sbPos) {
+          console.log(`🎯 📍 Small Blind is first to act`);
+        } else if (position === bbPos) {
+          console.log(`🎯 📍 Big Blind is first to act`);
+        } else {
+          console.log(`🎯 📍 Position ${position} is first to act (SB/BB must have folded)`);
+        }
+        break;
+      } else {
+        console.log(`🎯 No active player at position ${position}, checking next...`);
+      }
+      
+      position = (position + 1) % 9;
+      attempts++;
+    }
   }
   
   if (firstActivePosition === null) {
-    console.log('🎯 ERROR: No active players found for new street!');
-    firstActivePosition = dealerPosition; // Fallback
+    console.log('🎯 ❌ ERROR: No active players found for new street!');
+    if (activePlayers.length > 0) {
+      firstActivePosition = activePlayers[0].position;
+      console.log(`🎯 🔧 Using fallback: ${activePlayers[0].name} at position ${firstActivePosition}`);
+    } else {
+      firstActivePosition = dealerPosition;
+    }
   }
   
-  return players.map(player => ({
+  // Reset all players for new street
+  const resetPlayers = players.map(player => ({
     ...player,
     proffered: 0,
     lastAction: null,
     isActive: player.position === firstActivePosition && !player.isFolded && !player.isAnimatingFold
   }));
+  
+  // Final verification log
+  const newActivePlayer = resetPlayers.find(p => p.isActive);
+  if (newActivePlayer) {
+    console.log(`🎯 🎲 FINAL: ${newActivePlayer.name} at position ${newActivePlayer.position} is active for ${nextStreet}`);
+  }
+  
+  return resetPlayers;
 };

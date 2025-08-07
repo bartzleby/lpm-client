@@ -58,42 +58,49 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
   // Start new street
   const startNewStreet = () => {
-    console.log(`🎯 Ending ${currentStreet}, starting next street`);
+  console.log(`🎯 Ending ${currentStreet}, starting next street`);
+  
+  // Save current round
+  setRounds(prevRounds => [...prevRounds, currentBettingRound]);
+  
+  // Move to next street
+  const currentStreetIndex = streetNames.indexOf(currentStreet);
+  const nextStreet = streetNames[currentStreetIndex + 1];
+  
+  if (!nextStreet) {
+    console.log('🎯 No more streets - hand should be over');
+    return;
+  }
+  
+  console.log(`🎯 Starting ${nextStreet}`);
+  setCurrentStreet(nextStreet);
+  
+  // Reset betting for new street
+  setCurrentBet(0);
+  setLastRaiseSize(0);
+  
+  // Reset players for new street - WITH EXTRA DEBUGGING
+  console.log(`🎯 ⚡ CALLING resetPlayersForNewStreet for ${nextStreet}`);
+  setPlayers(prevPlayers => {
+    const newPlayers = resetPlayersForNewStreet(prevPlayers, gameConfig.dealerPosition, nextStreet);
     
-    // Save current round
-    setRounds(prevRounds => [...prevRounds, currentBettingRound]);
+    // Double-check who got set as active
+    const activePlayer = newPlayers.find(p => p.isActive);
+    console.log(`🎯 ⚡ AFTER resetPlayersForNewStreet: ${activePlayer ? `${activePlayer.name} at position ${activePlayer.position}` : 'NO ACTIVE PLAYER'} is active`);
     
-    // Move to next street
-    const currentStreetIndex = streetNames.indexOf(currentStreet);
-    const nextStreet = streetNames[currentStreetIndex + 1];
-    
-    if (!nextStreet) {
-      console.log('🎯 No more streets - hand should be over');
-      return;
-    }
-    
-    console.log(`🎯 Starting ${nextStreet}`);
-    setCurrentStreet(nextStreet);
-    
-    // Reset betting for new street
-    setCurrentBet(0);
-    setLastRaiseSize(0);
-    
-    // Reset players for new street
-    setPlayers(prevPlayers => 
-      resetPlayersForNewStreet(prevPlayers, gameConfig.dealerPosition, nextStreet)
-    );
-    
-    // Create new betting round
-    setCurrentBettingRound({
-      id: currentBettingRound.id + 1,
-      street: nextStreet,
-      actions: [],
-      cards: []
-    });
-    
-    setActionNumber(1);
-  };
+    return newPlayers;
+  });
+  
+  // Create new betting round
+  setCurrentBettingRound({
+    id: currentBettingRound.id + 1,
+    street: nextStreet,
+    actions: [],
+    cards: []
+  });
+  
+  setActionNumber(1);
+};
 
   // Deal cards to a player
   const dealCardsToPlayer = (playerId, cards) => {
@@ -136,126 +143,153 @@ export const useHandManager = (gameConfig, players, setPlayers) => {
 
   // Start recording a new hand
   const startNewHand = () => {
-    console.log('🎯 Starting new hand');
-    
-    setCurrentStreet('preflop');
-    setCurrentBet(gameConfig.bigBlind);
-    setLastRaiseSize(0);
-    setRounds([]);
-    clearActionBadges();
-    
-    // Initialize forced bets and player states
-    const { updatedPlayers, forcedBetActions, nextActionNum } = initializeForcedBets(players, gameConfig);
-    
-    // Set players with forced bets
-    setPlayers(updatedPlayers);
-    
-    // Create initial betting round
-    const initialBettingRound = createInitialBettingRound(forcedBetActions, nextActionNum);
-    setCurrentBettingRound(initialBettingRound);
-    setActionNumber(nextActionNum + 1);
+  console.log('🎯 Starting new hand');
+  
+  setCurrentStreet('preflop');
+  setCurrentBet(gameConfig.bigBlind);
+  setLastRaiseSize(0);
+  setRounds([]);
+  clearActionBadges();
+  
+  // Initialize forced bets and player states
+  const { updatedPlayers, forcedBetActions, nextActionNum } = initializeForcedBets(players, gameConfig);
+  
+  // Set players with forced bets
+  setPlayers(updatedPlayers);
+  
+  // Create initial betting round
+  const initialBettingRound = createInitialBettingRound(forcedBetActions, nextActionNum);
+  setCurrentBettingRound(initialBettingRound);
+  setActionNumber(nextActionNum + 1);
 
-    // Set initial active player (UTG for preflop)
-    const firstActivePosition = getActivePlayerPosition(gameConfig.dealerPosition, 'preflop');
-    setPlayers(prevPlayers => 
-      prevPlayers.map(player => ({
-        ...player,
-        isActive: player.position === firstActivePosition && !player.isFolded
-      }))
-    );
+  // Set initial active player (UTG for preflop) - FIXED VERSION
+  let firstActivePosition = (gameConfig.dealerPosition + 3) % 9; // UTG position
+  
+  // Make sure the UTG player is actually in the hand
+  const activePlayers = updatedPlayers.filter(p => !p.isFolded && p.starting_stack > 0);
+  let attempts = 0;
+  
+  console.log(`🎯 Looking for first active player starting from UTG position ${firstActivePosition}`);
+  console.log(`🎯 Active players:`, activePlayers.map(p => `${p.name}(${p.position})`));
+  
+  while (attempts < 9) {
+    const player = activePlayers.find(p => p.position === firstActivePosition);
+    if (player) {
+      console.log(`🎯 Found first active player for preflop: ${player.name} at position ${firstActivePosition}`);
+      break;
+    }
+    console.log(`🎯 Position ${firstActivePosition} not active, trying next...`);
+    firstActivePosition = (firstActivePosition + 1) % 9;
+    attempts++;
+  }
+  
+  // If somehow no active player found, use first available player
+  if (attempts >= 9 && activePlayers.length > 0) {
+    firstActivePosition = activePlayers[0].position;
+    console.log(`🎯 Fallback: using ${activePlayers[0].name} at position ${firstActivePosition}`);
+  }
+  
+  setPlayers(prevPlayers => 
+    prevPlayers.map(player => ({
+      ...player,
+      isActive: player.position === firstActivePosition && !player.isFolded
+    }))
+  );
 
-    // Calculate initial pot
-    const initialPot = gameConfig.smallBlind + gameConfig.bigBlind + 
-                      (gameConfig.ante * players.filter(p => p.starting_stack > 0).length) +
-                      (gameConfig.isTournament ? gameConfig.bigBlindAnte : 0);
-    setPot(initialPot);
+  // Calculate initial pot
+  const initialPot = gameConfig.smallBlind + gameConfig.bigBlind + 
+                    (gameConfig.ante * players.filter(p => p.starting_stack > 0).length) +
+                    (gameConfig.isTournament ? gameConfig.bigBlindAnte : 0);
+  setPot(initialPot);
   };
 
   // Handle player actions
   const handleAction = (action) => {
     const activePlayer = players.find(p => p.isActive && !p.isFolded);
-    if (!activePlayer) return;
+  if (!activePlayer) return;
 
-    console.log(`🎯 Handling action: ${action.type} for ${activePlayer.name}`, action);
+  console.log(`🎯 Handling action: ${action.type} for ${activePlayer.name}`, action);
 
-    // Calculate bet amounts
-    const { actualAmount, totalProffered } = calculateBetAmounts(action, activePlayer, currentBet);
+  // Calculate bet amounts
+  const { actualAmount, totalProffered } = calculateBetAmounts(action, activePlayer, currentBet);
 
-    // Update current bet and raise size for betting actions
-    if (action.type === 'bet') {
-      setCurrentBet(action.amount);
-      setLastRaiseSize(action.amount);
-    } else if (action.type === 'raise') {
-      const raiseSize = action.amount - currentBet;
-      setCurrentBet(action.amount);
-      setLastRaiseSize(raiseSize);
-    }
+  // Update current bet and raise size for betting actions
+  if (action.type === 'bet') {
+    setCurrentBet(action.amount);
+    setLastRaiseSize(action.amount);
+  } else if (action.type === 'raise') {
+    const raiseSize = action.amount - currentBet;
+    setCurrentBet(action.amount);
+    setLastRaiseSize(raiseSize);
+  }
 
-    // Create and record action
-    const actionObj = createActionObject(action, activePlayer, actionNumber, totalProffered);
+  // Create and record action
+  const actionObj = createActionObject(action, activePlayer, actionNumber, totalProffered);
+  
+  setCurrentBettingRound(prevBettingRound => ({
+    ...prevBettingRound,
+    actions: [...prevBettingRound.actions, actionObj]
+  }));
+
+  setActionNumber(prev => prev + 1);
+
+  // Handle fold action
+  if (action.type === 'fold') {
+    handleFoldAction(activePlayer, action, players, setPlayers, isBettingRoundComplete, startNewStreet);
+    return;
+  }
+
+  // Handle money actions (call, raise, bet)
+  if (['call', 'raise', 'bet'].includes(action.type)) {
+    setPot(prev => prev + actualAmount);
     
-    setCurrentBettingRound(prevBettingRound => ({
-      ...prevBettingRound,
-      actions: [...prevBettingRound.actions, actionObj]
-    }));
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => 
+        player.id === activePlayer.id 
+          ? processMoneyAction(action, player, actualAmount, totalProffered)
+          : player
+      )
+    );
+  } 
+  // Handle check action
+  else if (action.type === 'check') {
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => 
+        player.id === activePlayer.id 
+          ? processCheckAction(player, action, currentStreet, gameConfig, startNewStreet)
+          : player
+      )
+    );
+  }
 
-    setActionNumber(prev => prev + 1);
-
-    // Handle fold action
-    if (action.type === 'fold') {
-      handleFoldAction(activePlayer, action, players, setPlayers, isBettingRoundComplete, startNewStreet);
-      return;
-    }
-
-    // Handle money actions (call, raise, bet)
-    if (['call', 'raise', 'bet'].includes(action.type)) {
-      setPot(prev => prev + actualAmount);
-      
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => 
-          player.id === activePlayer.id 
-            ? processMoneyAction(action, player, actualAmount, totalProffered)
-            : player
-        )
-      );
-    } 
-    // Handle check action
-    else if (action.type === 'check') {
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => 
-          player.id === activePlayer.id 
-            ? processCheckAction(player, action, currentStreet, gameConfig, startNewStreet)
-            : player
-        )
-      );
-    }
-
-    // Check for betting round completion after a delay
-    setTimeout(() => {
-      setPlayers(currentPlayers => 
-        handleBettingRoundCompletion(
-          currentPlayers, 
-          isBettingRoundComplete, 
-          startNewStreet,
-          (pos, players) => {
-            // Find next active player
-            let nextPosition = (pos + 1) % 9;
-            let attempts = 0;
-            
-            while (attempts < 9) {
-              const nextPlayer = players.find(p => p.position === nextPosition);
-              if (nextPlayer && !nextPlayer.isFolded && !nextPlayer.isAnimatingFold) {
-                return nextPosition;
-              }
-              nextPosition = (nextPosition + 1) % 9;
-              attempts++;
-            }
-            return pos;
+  // IMMEDIATE check for betting round completion (no timeout)
+  // This should properly handle moving to next player OR next street
+  setPlayers(currentPlayers => 
+    handleBettingRoundCompletion(
+      currentPlayers, 
+      isBettingRoundComplete, 
+      startNewStreet,
+      (pos, players) => {
+        // Find next active player
+        let nextPosition = (pos + 1) % 9;
+        let attempts = 0;
+        
+        console.log(`🎯 Looking for next active player from position ${pos}`);
+        
+        while (attempts < 9) {
+          const nextPlayer = players.find(p => p.position === nextPosition);
+          if (nextPlayer && !nextPlayer.isFolded && !nextPlayer.isAnimatingFold) {
+            console.log(`🎯 Found next active player: ${nextPlayer.name} at position ${nextPosition}`);
+            return nextPosition;
           }
-        )
-      );
-    }, 150);
-  };
+          nextPosition = (nextPosition + 1) % 9;
+          attempts++;
+        }
+        return pos;
+      }
+    )
+  );
+};
 
   // Save current hand
   const saveCurrentHand = () => {

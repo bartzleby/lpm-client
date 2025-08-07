@@ -18,7 +18,7 @@ function HeroBox({ player, isHero, isDealer, position, onPlayerUpdate }) {
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
             // Shift all players up, with hero (position 0) getting extra clearance
-            const mobileYOffset = position === 0 ? -80 : -48; // Hero gets -80px, others get -48px
+            const mobileYOffset = position === 0 ? -90 : -100; // Hero gets -90px, others get -100px
             y += mobileYOffset;
         }
         
